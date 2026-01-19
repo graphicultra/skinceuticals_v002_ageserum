@@ -1,0 +1,166 @@
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  button {
+    pointer-events: all;
+  }
+
+  .fade{
+    opacity:0.0;
+    visibility: hidden;
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
+    -moz-transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
+    -webkit-transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
+  }
+  .show{
+    opacity:1.0;
+    visibility: visible;
+  }
+  .fade:not(.show) .fade.show{
+    opacity:0.0;
+    visibility: hidden;
+  }
+
+  #output-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  #canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+
+
+  #preview {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0px;
+    right: 0px;
+    left: 0;
+    padding: 0;
+    z-index: 99999;
+    box-sizing: border-box;
+    background-color: #0000008f;
+
+      video {
+          width: 100%;
+          height: 100%;
+      }
+
+      #close_btn {
+          background-color: #fff;
+          border-radius: 15px;
+          padding: 5px 7px;
+          position: absolute;
+          top: 50px;
+          right: 20px;
+          cursor: pointer;
+          z-index: 10000;
+      }
+
+      #share_btn {
+          position: absolute;
+          bottom: 80px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 60px;
+          height: 60px;
+          border-radius: 50%;
+          background-color: #ffffff;
+          border: none;
+          cursor: pointer;
+          font-size: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10000;
+      }
+
+      #download {
+          font-size: 14px;
+      }
+}
+
+.ui {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-content: center;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  align-content: center;
+  justify-content: center;
+  align-items: center;
+}
+
+.menu {
+  gap: 20px;
+
+  &.top {
+      position: absolute;
+      top: 20px;
+  }
+}
+
+#recording_ui .menu.top {
+  top: auto;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  position: fixed;      /* stays on screen */
+  gap: 12px;
+  z-index: 9999;
+}
+
+#record_toggle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: #ff0000;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  color: white;
+  transition: opacity 0.1s ease;
+  opacity: 1;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#record_toggle:hover {
+  opacity: 0.9;
+}
+
+#record_toggle.held {
+  opacity: 0.5;
+}
+
+#download {
+  display: none;
+}

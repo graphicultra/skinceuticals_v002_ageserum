@@ -1,0 +1,23 @@
+{
+  "name": "camera_kit_demo",
+  "version": "1.0.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "webpack-dev-server --mode=development --https --port 9000",
+    "build": "webpack"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "webpack": "^5.104.1",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "@snap/camera-kit": "^1.1.0",
+    "jquery": "^3.7.0",
+    "webpack-dashboard": "^3.3.8",
+    "webpack-dev-server": "^4.15.1"
+  }
+}
