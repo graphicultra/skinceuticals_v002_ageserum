@@ -505,308 +505,6 @@ function getConfigurationOverrides() {
     return overridesString && JSON.parse(overridesString);
 }
 //# sourceMappingURL=configurationOverrides.js.map
-;// ./node_modules/@snap/camera-kit/dist/configuration.js
-
-
-
-const defaultConfiguration = {
-    lensPerformance: { cluster: 0, benchmarks: [], webglRendererInfo: "unknown" },
-    logger: "noop",
-    logLevel: "info",
-    shouldUseWorker: true,
-    apiHostname: "camera-kit-api.snapar.com",
-    userAgentFlavor: "release",
-    fonts: [],
-};
-const configurationToken = "configuration";
-function isHandledAppleDevice() {
-    return (/iPad|iPhone|iPod/.test(navigator.platform) ||
-        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 2));
-}
-const createCameraKitConfigurationFactory = (configuration) => {
-    const overrides = getConfigurationOverrides();
-    if (overrides) {
-        console.warn("Configuration overrides applied", overrides);
-    }
-    return Injectable(configurationToken, () => {
-        const safeConfig = Object.assign(Object.assign({}, configuration), { lensPerformance: configuration.lensPerformance instanceof Promise
-                ?
-                    configuration.lensPerformance.catch(() => defaultConfiguration.lensPerformance)
-                : configuration.lensPerformance });
-        return Object.assign(Object.assign(Object.assign(Object.assign({}, defaultConfiguration), { shouldUseWorker: isHandledAppleDevice() ? false : defaultConfiguration.shouldUseWorker }), copyDefinedProperties(safeConfig)), copyDefinedProperties(overrides !== null && overrides !== void 0 ? overrides : {}));
-    });
-};
-//# sourceMappingURL=configuration.js.map
-;// ./node_modules/@snap/camera-kit/dist/namedErrors.js
-function cleanErrorStack(stack) {
-    const [first, _, ...rest] = stack.split("\n");
-    return [first, ...rest].join("\n");
-}
-function namedError(name) {
-    return (message, cause) => {
-        const error = new Error(message, { cause });
-        error.name = name;
-        error.stack = error.stack && cleanErrorStack(error.stack);
-        return error;
-    };
-}
-const legalError = namedError("LegalError");
-const lensContentValidationError = namedError("LensContentValidationError");
-const lensError = namedError("LensError");
-const cameraKitSourceError = namedError("CameraKitSourceError");
-const lensImagePickerError = namedError("LensImagePickerError");
-const cacheKeyNotFoundError = namedError("CacheKeyNotFoundError");
-const configurationError = namedError("ConfigurationError");
-const namedErrors_webGLError = namedError("WebGLError");
-const namedErrors_benchmarkError = namedError("BenchmarkError");
-const platformNotSupportedError = namedError("PlatformNotSupportedError");
-const lensExecutionError = namedError("LensExecutionError");
-const lensAbortError = namedError("LensAbortError");
-const persistentStoreError = namedError("PersistentStoreError");
-const lensAssetError = namedError("LensAssetError");
-const bootstrapError = namedError("BootstrapError");
-const argumentValidationError = namedError("ArgumentValidationError");
-//# sourceMappingURL=namedErrors.js.map
-;// ./node_modules/@snap/camera-kit/dist/benchmark/webglUtils.js
-
-const webGLEntityCreationError = (name) => webGLError(`Could not create ${name}.`);
-function webglUtils_createProgram(gl, vertexSource, fragmentSource) {
-    const vertexShader = createShader(gl, vertexSource, gl.VERTEX_SHADER);
-    const fragmentShader = createShader(gl, fragmentSource, gl.FRAGMENT_SHADER);
-    const program = gl.createProgram();
-    if (!program)
-        throw webGLEntityCreationError("WebGLProgram");
-    gl.attachShader(program, vertexShader);
-    gl.deleteShader(vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.deleteShader(fragmentShader);
-    gl.linkProgram(program);
-    const success = gl.getProgramParameter(program, gl.LINK_STATUS);
-    if (!success) {
-        const message = gl.getProgramInfoLog(program);
-        gl.deleteProgram(program);
-        throw webGLError(`WebGLProgram linking failed with status: ${message}.`);
-    }
-    return program;
-}
-function createShader(gl, source, type) {
-    const shader = gl.createShader(type);
-    if (!shader)
-        throw webGLEntityCreationError(`WebGLShader (type ${type})`);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    const success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
-    if (!success) {
-        const message = gl.getShaderInfoLog(shader);
-        gl.deleteShader(shader);
-        throw webGLError(`WebGLShader (type ${type}) compilation failed with status: ${message}.`);
-    }
-    return shader;
-}
-function webglUtils_createTexture(gl, width, height) {
-    const texture = gl.createTexture();
-    if (!texture)
-        throw webGLEntityCreationError("WebGLTexture");
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    return texture;
-}
-function webglUtils_createFramebuffer(gl, texture) {
-    const framebuffer = gl.createFramebuffer();
-    if (!framebuffer)
-        throw webGLEntityCreationError("WebGLFramebuffer");
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-    return framebuffer;
-}
-function webglUtils_setUniform1i(gl, program, name, data) {
-    gl.uniform1i(gl.getUniformLocation(program, name), data);
-}
-function webglUtils_setUniform4f(gl, program, name, data) {
-    gl.uniform4f(gl.getUniformLocation(program, name), ...data);
-}
-function webglUtils_promiseSync(gl) {
-    const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-    if (!sync)
-        throw webGLEntityCreationError("WebGLSync");
-    gl.flush();
-    return new Promise((resolve, reject) => {
-        const waitForSync = () => {
-            const glEnum = gl.clientWaitSync(sync, 0, 0);
-            switch (glEnum) {
-                case gl.TIMEOUT_EXPIRED:
-                    setTimeout(waitForSync);
-                    return;
-                case gl.WAIT_FAILED:
-                    gl.deleteSync(sync);
-                    return reject();
-                case gl.ALREADY_SIGNALED:
-                case gl.CONDITION_SATISFIED:
-                    gl.deleteSync(sync);
-                    return resolve();
-            }
-        };
-        waitForSync();
-    });
-}
-//# sourceMappingURL=webglUtils.js.map
-;// ./node_modules/@snap/camera-kit/dist/benchmark/benchmarkGflops.js
-
-
-const vertexSource = (/* unused pure expression or super */ null && (`#version 300 es
-
-precision mediump float;
-precision mediump int;
-
-in vec2 pos;
-
-void main() {
-    gl_Position = vec4(pos, 0.0, 1.0);
-}
-`));
-const fragmentSource = (/* unused pure expression or super */ null && (`#version 300 es
-
-precision mediump float;
-precision mediump int;
-
-uniform int LOOP_COUNT;
-uniform vec4 v0;
-uniform vec4 v1;
-uniform vec4 v2;
-
-out vec4 fragColor;
-
-#define REPEAT_2(x) x; x
-#define REPEAT_4(x) REPEAT_2(x); REPEAT_2(x)
-#define REPEAT_8(x) REPEAT_4(x); REPEAT_4(x)
-#define REPEAT_16(x) REPEAT_8(x); REPEAT_8(x)
-#define REPEAT_32(x) REPEAT_16(x); REPEAT_16(x)
-
-void main() {
-    vec4 r = v2;
-    for (int i = 0; i < LOOP_COUNT; i++) {
-        REPEAT_32(r = r * v1 + v0);
-    }
-    fragColor = r;
-}
-`));
-const width = 1024;
-const height = 1024;
-const budgetMs = 300;
-const maxLoopCount = 1000;
-function prepareBenchmark(gl) {
-    const texture = createTexture(gl, width, height);
-    const framebuffer = createFramebuffer(gl, texture);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    const buffer = gl.createBuffer();
-    if (!buffer) {
-        throw new Error("Failed to create WebGLBuffer.");
-    }
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, 1, -1, -1, 1, -1, 1, 1]), gl.STATIC_DRAW);
-    gl.viewport(0, 0, width, height);
-    gl.disable(gl.CULL_FACE);
-    gl.disable(gl.DEPTH_TEST);
-    const program = createProgram(gl, vertexSource, fragmentSource);
-    gl.useProgram(program);
-    const posLocation = gl.getAttribLocation(program, "pos");
-    gl.enableVertexAttribArray(posLocation);
-    gl.vertexAttribPointer(posLocation, 2, gl.FLOAT, false, 0, 0);
-    setUniform4f(gl, program, "v0", [1.15, 1.23, 1.47, 1.84]);
-    setUniform4f(gl, program, "v1", [1.65, 1.22, 1.69, 1.04]);
-    setUniform4f(gl, program, "v2", [1.05, 1.3, 1.55, 1.23]);
-    return {
-        program,
-        cleanupBenchmark: () => {
-            gl.deleteProgram(program);
-            gl.deleteBuffer(buffer);
-            gl.deleteFramebuffer(framebuffer);
-            gl.deleteTexture(texture);
-        },
-    };
-}
-function runBenchmark(gl, program) {
-    return __awaiter(this, void 0, void 0, function* () {
-        yield promiseSync(gl);
-        const start = performance.now();
-        const flops = [];
-        let loopCount = 20;
-        while (true) {
-            setUniform1i(gl, program, "LOOP_COUNT", loopCount);
-            const iterationStart = performance.now();
-            gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
-            yield promiseSync(gl);
-            const iterationEnd = performance.now();
-            const duration = iterationEnd - iterationStart;
-            flops.push(loopCount / duration);
-            const remainingBudgetMs = budgetMs - (iterationEnd - start);
-            if (remainingBudgetMs < 0)
-                break;
-            if (loopCount < maxLoopCount) {
-                loopCount += remainingBudgetMs < duration ? 10 : (0.6 * loopCount * remainingBudgetMs) / duration;
-            }
-        }
-        const maxFlops = Math.max(...flops) * (8 * 32) * width * height;
-        return maxFlops / 1e6;
-    });
-}
-const benchmarkGflops_gflopsClusterCenters = new Map([
-    [34, 1],
-    [134, 2],
-    [385, 3],
-    [783, 4],
-    [1484, 5],
-    [2313, 6],
-]);
-function benchmarkGflops_benchmarkGflops(gl) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const { program, cleanupBenchmark } = prepareBenchmark(gl);
-        const gflops = yield runBenchmark(gl, program);
-        cleanupBenchmark();
-        return { name: "gflops", value: gflops };
-    });
-}
-//# sourceMappingURL=benchmarkGflops.js.map
-;// ./node_modules/@snap/camera-kit/dist/benchmark/estimateLensPerformanceCluster.js
-
-
-
-const findNearest = (n, arr) => arr.reduce((a, b) => (Math.abs(a - n) <= Math.abs(b - n) ? a : b));
-const webglContextAttributes = {
-    alpha: false,
-    antialias: false,
-    premultipliedAlpha: false,
-    preserveDrawingBuffer: false,
-    depth: false,
-    stencil: false,
-    failIfMajorPerformanceCaveat: false,
-    powerPreference: "high-performance",
-};
-function estimateLensPerformance() {
-    var _a;
-    return __awaiter(this, void 0, void 0, function* () {
-        const canvas = document.createElement("canvas");
-        const gl = canvas.getContext("webgl2", webglContextAttributes);
-        if (!gl)
-            throw benchmarkError("WebGL2 is required to compute performance, but it is not supported.");
-        const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
-        const webglRendererInfo = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : "unknown";
-        const gflops = yield benchmarkGflops(gl);
-        const nearestGflopsClusterCenter = findNearest(gflops.value, Array.from(gflopsClusterCenters.keys()));
-        const gflopsCluster = (_a = gflopsClusterCenters.get(nearestGflopsClusterCenter)) !== null && _a !== void 0 ? _a : 0;
-        return {
-            cluster: gflopsCluster,
-            benchmarks: [gflops],
-            webglRendererInfo,
-        };
-    });
-}
-//# sourceMappingURL=estimateLensPerformanceCluster.js.map
 ;// ./node_modules/tslib/tslib.es6.mjs
 /******************************************************************************
 Copyright (c) Microsoft Corporation.
@@ -1210,222 +908,6 @@ function __rewriteRelativeImportExtension(path, preserveJsx) {
   __rewriteRelativeImportExtension,
 });
 
-;// ./node_modules/@snap/ts-inject/dist/esm/memoize.js
-function isMemoized(fn) {
-    return typeof fn === "function" && typeof fn.delegate === "function";
-}
-function memoize(thisArg, delegate) {
-    let memo;
-    const memoized = (...args) => {
-        if (typeof memo !== "undefined")
-            return memo;
-        memo = delegate.apply(memoized.thisArg, args);
-        return memo;
-    };
-    memoized.delegate = delegate;
-    memoized.thisArg = thisArg;
-    return memoized;
-}
-//# sourceMappingURL=memoize.js.map
-;// ./node_modules/@snap/ts-inject/dist/esm/entries.js
-const entries = (o) => Object.entries(o);
-const fromEntries = (entries) => Object.fromEntries(entries);
-//# sourceMappingURL=entries.js.map
-;// ./node_modules/@snap/ts-inject/dist/esm/PartialContainer.js
-
-
-
-class PartialContainer_PartialContainer {
-    injectables;
-    constructor(injectables) {
-        this.injectables = injectables;
-    }
-    provides(fn) {
-        return new PartialContainer_PartialContainer({ ...this.injectables, [fn.token]: fn });
-    }
-    providesValue = (token, value) => this.provides(Injectable(token, [], () => value));
-    providesClass = (token, cls) => this.provides(ClassInjectable(token, cls));
-    getFactories(parent) {
-        let factories = undefined;
-        return (factories = Object.fromEntries(entries(this.injectables).map(([token, fn]) => [
-            token,
-            memoize(parent, () => fn(...fn.dependencies.map((t) => {
-                return t === token
-                    ? parent.get(t)
-                    : factories[t]
-                        ? factories[t]()
-                        : parent.get(t);
-            }))),
-        ])));
-    }
-    getTokens() {
-        return Object.keys(this.injectables);
-    }
-}
-//# sourceMappingURL=PartialContainer.js.map
-;// ./node_modules/@snap/ts-inject/dist/esm/Container.js
-
-
-
-
-const CONTAINER = "$container";
-class Container {
-    static provides(fnOrContainer) {
-        if (fnOrContainer instanceof PartialContainer_PartialContainer)
-            return new Container({}).provides(fnOrContainer);
-        if (fnOrContainer instanceof Container)
-            return new Container({}).provides(fnOrContainer);
-        return new Container({}).provides(fnOrContainer);
-    }
-    static providesValue(token, value) {
-        return new Container({}).providesValue(token, value);
-    }
-    static fromObject(services) {
-        return entries(services).reduce((container, [token, value]) => container.providesValue(token, value), new Container({}));
-    }
-    factories;
-    constructor(factories) {
-        const memoizedFactories = {};
-        for (const k in factories) {
-            const fn = factories[k];
-            if (isMemoized(fn)) {
-                memoizedFactories[k] = fn;
-                fn.thisArg = this;
-            }
-            else {
-                memoizedFactories[k] = memoize(this, fn);
-            }
-        }
-        this.factories = memoizedFactories;
-    }
-    copy(scopedServices) {
-        const factories = { ...this.factories };
-        (scopedServices || []).forEach((token) => {
-            factories[token] = this.factories[token].delegate;
-        });
-        return new Container(factories);
-    }
-    get(token) {
-        if (token === CONTAINER)
-            return this;
-        const factory = this.factories[token];
-        if (!factory) {
-            throw new Error(`[Container::get] Could not find Service for Token "${String(token)}". This should've caused a ` +
-                "compile-time error. If the Token is 'undefined', check all your calls to the Injectable " +
-                "function. Make sure you define dependencies using string literals or string constants that are " +
-                "definitely initialized before the call to Injectable.");
-        }
-        return factory();
-    }
-    run(fnOrContainer) {
-        if (fnOrContainer instanceof PartialContainer_PartialContainer) {
-            const runnableContainer = this.provides(fnOrContainer);
-            for (const token of fnOrContainer.getTokens()) {
-                runnableContainer.get(token);
-            }
-        }
-        else {
-            this.provides(fnOrContainer).get(fnOrContainer.token);
-        }
-        return this;
-    }
-    provides(fnOrContainer) {
-        if (fnOrContainer instanceof PartialContainer_PartialContainer || fnOrContainer instanceof Container) {
-            const factories = fnOrContainer instanceof PartialContainer_PartialContainer ? fnOrContainer.getFactories(this) : fnOrContainer.factories;
-            return new Container({
-                ...this.factories,
-                ...factories,
-            });
-        }
-        return this.providesService(fnOrContainer);
-    }
-    providesClass = (token, cls) => this.providesService(ClassInjectable(token, cls));
-    providesValue = (token, value) => this.providesService(Injectable(token, [], () => value));
-    appendValue = (token, value) => this.providesService(ConcatInjectable(token, () => value));
-    appendClass = (token, cls) => this.providesService(ConcatInjectable(token, () => this.providesClass(token, cls).get(token)));
-    append = (fn) => this.providesService(ConcatInjectable(fn.token, () => this.providesService(fn).get(fn.token)));
-    providesService(fn) {
-        const token = fn.token;
-        const dependencies = fn.dependencies;
-        const getFromParent = dependencies.indexOf(token) === -1 ? undefined : () => this.get(token);
-        const factory = memoize(this, function () {
-            return fn(...dependencies.map((t) => (t === token ? getFromParent() : this.get(t))));
-        });
-        const factories = { ...this.factories, [token]: factory };
-        return new Container(factories);
-    }
-}
-//# sourceMappingURL=Container.js.map
-;// ./node_modules/@snap/camera-kit/dist/handlers/arrayBufferParsingHandler.js
-
-const createArrayBufferParsingHandler = () => (next) => (req, metadata) => tslib_es6_awaiter(void 0, void 0, void 0, function* () {
-    const response = yield next(req, metadata);
-    let buffer;
-    try {
-        buffer = yield response.arrayBuffer();
-    }
-    catch (_) {
-        buffer = new ArrayBuffer(0);
-    }
-    return [buffer, response];
-});
-//# sourceMappingURL=arrayBufferParsingHandler.js.map
-;// ./node_modules/@snap/camera-kit/dist/handlers/HandlerChainBuilder.js
-class HandlerChainBuilder {
-    constructor(inner) {
-        this.inner = inner;
-    }
-    get handler() {
-        return this.inner;
-    }
-    map(outer) {
-        const outerHandler = (req, metadata) => {
-            var _a;
-            const abort = new AbortController();
-            const signal = abort.signal;
-            let innerCompleted = false;
-            const maybeAbort = () => {
-                var _a;
-                if (signal.aborted || innerCompleted)
-                    return;
-                abort.abort();
-                (_a = metadata === null || metadata === void 0 ? void 0 : metadata.signal) === null || _a === void 0 ? void 0 : _a.removeEventListener("abort", maybeAbort);
-            };
-            (_a = metadata === null || metadata === void 0 ? void 0 : metadata.signal) === null || _a === void 0 ? void 0 : _a.addEventListener("abort", maybeAbort);
-            const innerHandler = new Proxy(this.inner, {
-                apply: (target, thisArg, args) => {
-                    const [req, metadata] = args;
-                    if (metadata === null || metadata === void 0 ? void 0 : metadata.isSideEffect)
-                        innerCompleted = true;
-                    const abortListeners = [];
-                    signal.addEventListener = new Proxy(signal.addEventListener, {
-                        apply: (target, thisArg, args) => {
-                            abortListeners.push(args[1]);
-                            return Reflect.apply(target, thisArg, args);
-                        },
-                    });
-                    const cleanupAndMarkComplete = () => {
-                        var _a;
-                        (_a = metadata === null || metadata === void 0 ? void 0 : metadata.signal) === null || _a === void 0 ? void 0 : _a.removeEventListener("abort", maybeAbort);
-                        abortListeners.forEach((listener) => signal.removeEventListener("abort", listener));
-                        innerCompleted = true;
-                    };
-                    const innerResponse = Reflect.apply(target, thisArg, [
-                        req,
-                        Object.assign(Object.assign({}, metadata), { isSideEffect: false, signal }),
-                    ]);
-                    innerResponse.catch(() => { }).then(cleanupAndMarkComplete);
-                    return innerResponse;
-                },
-            });
-            const outerResponse = outer(innerHandler)(req, metadata);
-            outerResponse.catch(() => { }).then(maybeAbort);
-            return outerResponse;
-        };
-        return new HandlerChainBuilder(outerHandler);
-    }
-}
-//# sourceMappingURL=HandlerChainBuilder.js.map
 ;// ./node_modules/rxjs/dist/esm5/internal/util/isFunction.js
 function isFunction(value) {
     return typeof value === 'function';
@@ -2192,8 +1674,8 @@ var AnonymousSubject = (function (_super) {
 
 //# sourceMappingURL=Subject.js.map
 ;// ./node_modules/@snap/camera-kit/dist/common/entries.js
-const entries_entries = (o) => Object.entries(o);
-const entries_fromEntries = (entries) => Object.fromEntries(entries);
+const entries = (o) => Object.entries(o);
+const fromEntries = (entries) => Object.fromEntries(entries);
 //# sourceMappingURL=entries.js.map
 ;// ./node_modules/@snap/camera-kit/dist/logger/logger.js
 
@@ -2202,7 +1684,6 @@ let logEntriesSubject = new Subject();
 const logLevelMap = {
     error: 3,
     warn: 2,
-    log: 1,
     info: 1,
     debug: 0,
 };
@@ -2210,7 +1691,7 @@ function resetLogger() {
     return (logEntriesSubject = new Subject());
 }
 function getLogger(module) {
-    return entries_entries(logLevelMap).reduce((logger, [level]) => {
+    return entries(logLevelMap).reduce((logger, [level]) => {
         logger[level] = (...messages) => {
             logEntriesSubject.next({
                 time: new Date(),
@@ -2222,7 +1703,549 @@ function getLogger(module) {
         return logger;
     }, {});
 }
+function mapLogger(logger) {
+    if (!logger || logger === "noop") {
+        return noopLogger;
+    }
+    if (logger === "console") {
+        return console;
+    }
+    for (const level of Object.keys(logLevelMap)) {
+        const logMethod = logger[level];
+        if (typeof logMethod !== "function") {
+            throw new Error(`Logger method '${level}' is not available on the provided logger instance.`);
+        }
+    }
+    return logger;
+}
+const noopLogger = {
+    error: () => { },
+    warn: () => { },
+    info: () => { },
+    debug: () => { },
+};
 //# sourceMappingURL=logger.js.map
+;// ./node_modules/@snap/camera-kit/dist/configuration.js
+
+
+
+
+const defaultConfiguration = {
+    lensPerformance: { cluster: 0, benchmarks: [], webglRendererInfo: "unknown" },
+    logger: noopLogger,
+    logLevel: "info",
+    shouldUseWorker: true,
+    apiHostname: "camera-kit-api.snapar.com",
+    userAgentFlavor: "release",
+    fonts: [],
+    trustedTypesPolicyName: "snap-camera-kit",
+};
+const configurationToken = "configuration";
+function isHandledAppleDevice() {
+    return (/iPad|iPhone|iPod/.test(navigator.platform) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 2));
+}
+const createCameraKitConfigurationFactory = (configuration) => {
+    const overrides = getConfigurationOverrides();
+    if (overrides) {
+        console.warn("Configuration overrides applied", overrides);
+    }
+    return Injectable(configurationToken, () => {
+        var _a;
+        const safeConfig = Object.assign(Object.assign({}, configuration), { lensPerformance: configuration.lensPerformance instanceof Promise
+                ?
+                    configuration.lensPerformance.catch(() => defaultConfiguration.lensPerformance)
+                : configuration.lensPerformance });
+        return Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, defaultConfiguration), { shouldUseWorker: isHandledAppleDevice() ? false : defaultConfiguration.shouldUseWorker }), copyDefinedProperties(safeConfig)), copyDefinedProperties(overrides !== null && overrides !== void 0 ? overrides : {})), { logger: mapLogger((_a = safeConfig.logger) !== null && _a !== void 0 ? _a : overrides === null || overrides === void 0 ? void 0 : overrides.logger) });
+    });
+};
+//# sourceMappingURL=configuration.js.map
+;// ./node_modules/@snap/camera-kit/dist/namedErrors.js
+function cleanErrorStack(stack) {
+    const [first, _, ...rest] = stack.split("\n");
+    return [first, ...rest].join("\n");
+}
+function namedError(name) {
+    return (message, cause) => {
+        const error = new Error(message, { cause });
+        error.name = name;
+        error.stack = error.stack && cleanErrorStack(error.stack);
+        return error;
+    };
+}
+const legalError = namedError("LegalError");
+const lensContentValidationError = namedError("LensContentValidationError");
+const lensError = namedError("LensError");
+const cameraKitSourceError = namedError("CameraKitSourceError");
+const lensImagePickerError = namedError("LensImagePickerError");
+const cacheKeyNotFoundError = namedError("CacheKeyNotFoundError");
+const configurationError = namedError("ConfigurationError");
+const namedErrors_webGLError = namedError("WebGLError");
+const namedErrors_benchmarkError = namedError("BenchmarkError");
+const platformNotSupportedError = namedError("PlatformNotSupportedError");
+const lensExecutionError = namedError("LensExecutionError");
+const lensAbortError = namedError("LensAbortError");
+const persistentStoreError = namedError("PersistentStoreError");
+const lensAssetError = namedError("LensAssetError");
+const bootstrapError = namedError("BootstrapError");
+const argumentValidationError = namedError("ArgumentValidationError");
+//# sourceMappingURL=namedErrors.js.map
+;// ./node_modules/@snap/camera-kit/dist/benchmark/webglUtils.js
+
+const webGLEntityCreationError = (name) => webGLError(`Could not create ${name}.`);
+function webglUtils_createProgram(gl, vertexSource, fragmentSource) {
+    const vertexShader = createShader(gl, vertexSource, gl.VERTEX_SHADER);
+    const fragmentShader = createShader(gl, fragmentSource, gl.FRAGMENT_SHADER);
+    const program = gl.createProgram();
+    if (!program)
+        throw webGLEntityCreationError("WebGLProgram");
+    gl.attachShader(program, vertexShader);
+    gl.deleteShader(vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.deleteShader(fragmentShader);
+    gl.linkProgram(program);
+    const success = gl.getProgramParameter(program, gl.LINK_STATUS);
+    if (!success) {
+        const message = gl.getProgramInfoLog(program);
+        gl.deleteProgram(program);
+        throw webGLError(`WebGLProgram linking failed with status: ${message}.`);
+    }
+    return program;
+}
+function createShader(gl, source, type) {
+    const shader = gl.createShader(type);
+    if (!shader)
+        throw webGLEntityCreationError(`WebGLShader (type ${type})`);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    const success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+    if (!success) {
+        const message = gl.getShaderInfoLog(shader);
+        gl.deleteShader(shader);
+        throw webGLError(`WebGLShader (type ${type}) compilation failed with status: ${message}.`);
+    }
+    return shader;
+}
+function webglUtils_createTexture(gl, width, height) {
+    const texture = gl.createTexture();
+    if (!texture)
+        throw webGLEntityCreationError("WebGLTexture");
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    return texture;
+}
+function webglUtils_createFramebuffer(gl, texture) {
+    const framebuffer = gl.createFramebuffer();
+    if (!framebuffer)
+        throw webGLEntityCreationError("WebGLFramebuffer");
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    return framebuffer;
+}
+function webglUtils_setUniform1i(gl, program, name, data) {
+    gl.uniform1i(gl.getUniformLocation(program, name), data);
+}
+function webglUtils_setUniform4f(gl, program, name, data) {
+    gl.uniform4f(gl.getUniformLocation(program, name), ...data);
+}
+function webglUtils_promiseSync(gl) {
+    const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    if (!sync)
+        throw webGLEntityCreationError("WebGLSync");
+    gl.flush();
+    return new Promise((resolve, reject) => {
+        const waitForSync = () => {
+            const glEnum = gl.clientWaitSync(sync, 0, 0);
+            switch (glEnum) {
+                case gl.TIMEOUT_EXPIRED:
+                    setTimeout(waitForSync);
+                    return;
+                case gl.WAIT_FAILED:
+                    gl.deleteSync(sync);
+                    return reject();
+                case gl.ALREADY_SIGNALED:
+                case gl.CONDITION_SATISFIED:
+                    gl.deleteSync(sync);
+                    return resolve();
+            }
+        };
+        waitForSync();
+    });
+}
+//# sourceMappingURL=webglUtils.js.map
+;// ./node_modules/@snap/camera-kit/dist/benchmark/benchmarkGflops.js
+
+
+const vertexSource = (/* unused pure expression or super */ null && (`#version 300 es
+
+precision mediump float;
+precision mediump int;
+
+in vec2 pos;
+
+void main() {
+    gl_Position = vec4(pos, 0.0, 1.0);
+}
+`));
+const fragmentSource = (/* unused pure expression or super */ null && (`#version 300 es
+
+precision mediump float;
+precision mediump int;
+
+uniform int LOOP_COUNT;
+uniform vec4 v0;
+uniform vec4 v1;
+uniform vec4 v2;
+
+out vec4 fragColor;
+
+#define REPEAT_2(x) x; x
+#define REPEAT_4(x) REPEAT_2(x); REPEAT_2(x)
+#define REPEAT_8(x) REPEAT_4(x); REPEAT_4(x)
+#define REPEAT_16(x) REPEAT_8(x); REPEAT_8(x)
+#define REPEAT_32(x) REPEAT_16(x); REPEAT_16(x)
+
+void main() {
+    vec4 r = v2;
+    for (int i = 0; i < LOOP_COUNT; i++) {
+        REPEAT_32(r = r * v1 + v0);
+    }
+    fragColor = r;
+}
+`));
+const width = 1024;
+const height = 1024;
+const budgetMs = 300;
+const maxLoopCount = 1000;
+function prepareBenchmark(gl) {
+    const texture = createTexture(gl, width, height);
+    const framebuffer = createFramebuffer(gl, texture);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    const buffer = gl.createBuffer();
+    if (!buffer) {
+        throw new Error("Failed to create WebGLBuffer.");
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, 1, -1, -1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+    gl.viewport(0, 0, width, height);
+    gl.disable(gl.CULL_FACE);
+    gl.disable(gl.DEPTH_TEST);
+    const program = createProgram(gl, vertexSource, fragmentSource);
+    gl.useProgram(program);
+    const posLocation = gl.getAttribLocation(program, "pos");
+    gl.enableVertexAttribArray(posLocation);
+    gl.vertexAttribPointer(posLocation, 2, gl.FLOAT, false, 0, 0);
+    setUniform4f(gl, program, "v0", [1.15, 1.23, 1.47, 1.84]);
+    setUniform4f(gl, program, "v1", [1.65, 1.22, 1.69, 1.04]);
+    setUniform4f(gl, program, "v2", [1.05, 1.3, 1.55, 1.23]);
+    return {
+        program,
+        cleanupBenchmark: () => {
+            gl.deleteProgram(program);
+            gl.deleteBuffer(buffer);
+            gl.deleteFramebuffer(framebuffer);
+            gl.deleteTexture(texture);
+        },
+    };
+}
+function runBenchmark(gl, program) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield promiseSync(gl);
+        const start = performance.now();
+        const flops = [];
+        let loopCount = 20;
+        while (true) {
+            setUniform1i(gl, program, "LOOP_COUNT", loopCount);
+            const iterationStart = performance.now();
+            gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+            yield promiseSync(gl);
+            const iterationEnd = performance.now();
+            const duration = iterationEnd - iterationStart;
+            flops.push(loopCount / duration);
+            const remainingBudgetMs = budgetMs - (iterationEnd - start);
+            if (remainingBudgetMs < 0)
+                break;
+            if (loopCount < maxLoopCount) {
+                loopCount += remainingBudgetMs < duration ? 10 : (0.6 * loopCount * remainingBudgetMs) / duration;
+            }
+        }
+        const maxFlops = Math.max(...flops) * (8 * 32) * width * height;
+        return maxFlops / 1e6;
+    });
+}
+const benchmarkGflops_gflopsClusterCenters = new Map([
+    [34, 1],
+    [134, 2],
+    [385, 3],
+    [783, 4],
+    [1484, 5],
+    [2313, 6],
+]);
+function benchmarkGflops_benchmarkGflops(gl) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const { program, cleanupBenchmark } = prepareBenchmark(gl);
+        const gflops = yield runBenchmark(gl, program);
+        cleanupBenchmark();
+        return { name: "gflops", value: gflops };
+    });
+}
+//# sourceMappingURL=benchmarkGflops.js.map
+;// ./node_modules/@snap/camera-kit/dist/benchmark/estimateLensPerformanceCluster.js
+
+
+
+const findNearest = (n, arr) => arr.reduce((a, b) => (Math.abs(a - n) <= Math.abs(b - n) ? a : b));
+const webglContextAttributes = {
+    alpha: false,
+    antialias: false,
+    premultipliedAlpha: false,
+    preserveDrawingBuffer: false,
+    depth: false,
+    stencil: false,
+    failIfMajorPerformanceCaveat: false,
+    powerPreference: "high-performance",
+};
+function estimateLensPerformance() {
+    var _a;
+    return __awaiter(this, void 0, void 0, function* () {
+        const canvas = document.createElement("canvas");
+        const gl = canvas.getContext("webgl2", webglContextAttributes);
+        if (!gl)
+            throw benchmarkError("WebGL2 is required to compute performance, but it is not supported.");
+        const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
+        const webglRendererInfo = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : "unknown";
+        const gflops = yield benchmarkGflops(gl);
+        const nearestGflopsClusterCenter = findNearest(gflops.value, Array.from(gflopsClusterCenters.keys()));
+        const gflopsCluster = (_a = gflopsClusterCenters.get(nearestGflopsClusterCenter)) !== null && _a !== void 0 ? _a : 0;
+        return {
+            cluster: gflopsCluster,
+            benchmarks: [gflops],
+            webglRendererInfo,
+        };
+    });
+}
+//# sourceMappingURL=estimateLensPerformanceCluster.js.map
+;// ./node_modules/@snap/ts-inject/dist/esm/memoize.js
+function isMemoized(fn) {
+    return typeof fn === "function" && typeof fn.delegate === "function";
+}
+function memoize(thisArg, delegate) {
+    let memo;
+    const memoized = (...args) => {
+        if (typeof memo !== "undefined")
+            return memo;
+        memo = delegate.apply(memoized.thisArg, args);
+        return memo;
+    };
+    memoized.delegate = delegate;
+    memoized.thisArg = thisArg;
+    return memoized;
+}
+//# sourceMappingURL=memoize.js.map
+;// ./node_modules/@snap/ts-inject/dist/esm/entries.js
+const entries_entries = (o) => Object.entries(o);
+const entries_fromEntries = (entries) => Object.fromEntries(entries);
+//# sourceMappingURL=entries.js.map
+;// ./node_modules/@snap/ts-inject/dist/esm/PartialContainer.js
+
+
+
+class PartialContainer_PartialContainer {
+    injectables;
+    constructor(injectables) {
+        this.injectables = injectables;
+    }
+    provides(fn) {
+        return new PartialContainer_PartialContainer({ ...this.injectables, [fn.token]: fn });
+    }
+    providesValue = (token, value) => this.provides(Injectable(token, [], () => value));
+    providesClass = (token, cls) => this.provides(ClassInjectable(token, cls));
+    getFactories(parent) {
+        let factories = undefined;
+        return (factories = Object.fromEntries(entries_entries(this.injectables).map(([token, fn]) => [
+            token,
+            memoize(parent, () => fn(...fn.dependencies.map((t) => {
+                return t === token
+                    ? parent.get(t)
+                    : factories[t]
+                        ? factories[t]()
+                        : parent.get(t);
+            }))),
+        ])));
+    }
+    getTokens() {
+        return Object.keys(this.injectables);
+    }
+}
+//# sourceMappingURL=PartialContainer.js.map
+;// ./node_modules/@snap/ts-inject/dist/esm/Container.js
+
+
+
+
+const CONTAINER = "$container";
+class Container {
+    static provides(fnOrContainer) {
+        if (fnOrContainer instanceof PartialContainer_PartialContainer)
+            return new Container({}).provides(fnOrContainer);
+        if (fnOrContainer instanceof Container)
+            return new Container({}).provides(fnOrContainer);
+        return new Container({}).provides(fnOrContainer);
+    }
+    static providesValue(token, value) {
+        return new Container({}).providesValue(token, value);
+    }
+    static fromObject(services) {
+        return entries_entries(services).reduce((container, [token, value]) => container.providesValue(token, value), new Container({}));
+    }
+    factories;
+    constructor(factories) {
+        const memoizedFactories = {};
+        for (const k in factories) {
+            const fn = factories[k];
+            if (isMemoized(fn)) {
+                memoizedFactories[k] = fn;
+                fn.thisArg = this;
+            }
+            else {
+                memoizedFactories[k] = memoize(this, fn);
+            }
+        }
+        this.factories = memoizedFactories;
+    }
+    copy(scopedServices) {
+        const factories = { ...this.factories };
+        (scopedServices || []).forEach((token) => {
+            factories[token] = this.factories[token].delegate;
+        });
+        return new Container(factories);
+    }
+    get(token) {
+        if (token === CONTAINER)
+            return this;
+        const factory = this.factories[token];
+        if (!factory) {
+            throw new Error(`[Container::get] Could not find Service for Token "${String(token)}". This should've caused a ` +
+                "compile-time error. If the Token is 'undefined', check all your calls to the Injectable " +
+                "function. Make sure you define dependencies using string literals or string constants that are " +
+                "definitely initialized before the call to Injectable.");
+        }
+        return factory();
+    }
+    run(fnOrContainer) {
+        if (fnOrContainer instanceof PartialContainer_PartialContainer) {
+            const runnableContainer = this.provides(fnOrContainer);
+            for (const token of fnOrContainer.getTokens()) {
+                runnableContainer.get(token);
+            }
+        }
+        else {
+            this.provides(fnOrContainer).get(fnOrContainer.token);
+        }
+        return this;
+    }
+    provides(fnOrContainer) {
+        if (fnOrContainer instanceof PartialContainer_PartialContainer || fnOrContainer instanceof Container) {
+            const factories = fnOrContainer instanceof PartialContainer_PartialContainer ? fnOrContainer.getFactories(this) : fnOrContainer.factories;
+            return new Container({
+                ...this.factories,
+                ...factories,
+            });
+        }
+        return this.providesService(fnOrContainer);
+    }
+    providesClass = (token, cls) => this.providesService(ClassInjectable(token, cls));
+    providesValue = (token, value) => this.providesService(Injectable(token, [], () => value));
+    appendValue = (token, value) => this.providesService(ConcatInjectable(token, () => value));
+    appendClass = (token, cls) => this.providesService(ConcatInjectable(token, () => this.providesClass(token, cls).get(token)));
+    append = (fn) => this.providesService(ConcatInjectable(fn.token, () => this.providesService(fn).get(fn.token)));
+    providesService(fn) {
+        const token = fn.token;
+        const dependencies = fn.dependencies;
+        const getFromParent = dependencies.indexOf(token) === -1 ? undefined : () => this.get(token);
+        const factory = memoize(this, function () {
+            return fn(...dependencies.map((t) => (t === token ? getFromParent() : this.get(t))));
+        });
+        const factories = { ...this.factories, [token]: factory };
+        return new Container(factories);
+    }
+}
+//# sourceMappingURL=Container.js.map
+;// ./node_modules/@snap/camera-kit/dist/handlers/arrayBufferParsingHandler.js
+
+const createArrayBufferParsingHandler = () => (next) => (req, metadata) => tslib_es6_awaiter(void 0, void 0, void 0, function* () {
+    const response = yield next(req, metadata);
+    let buffer;
+    try {
+        buffer = yield response.arrayBuffer();
+    }
+    catch (_) {
+        buffer = new ArrayBuffer(0);
+    }
+    return [buffer, response];
+});
+//# sourceMappingURL=arrayBufferParsingHandler.js.map
+;// ./node_modules/@snap/camera-kit/dist/handlers/HandlerChainBuilder.js
+class HandlerChainBuilder {
+    constructor(inner) {
+        this.inner = inner;
+    }
+    get handler() {
+        return this.inner;
+    }
+    map(outer) {
+        const outerHandler = (req, metadata) => {
+            var _a;
+            const abort = new AbortController();
+            const signal = abort.signal;
+            let innerCompleted = false;
+            const maybeAbort = () => {
+                var _a;
+                if (signal.aborted || innerCompleted)
+                    return;
+                abort.abort();
+                (_a = metadata === null || metadata === void 0 ? void 0 : metadata.signal) === null || _a === void 0 ? void 0 : _a.removeEventListener("abort", maybeAbort);
+            };
+            (_a = metadata === null || metadata === void 0 ? void 0 : metadata.signal) === null || _a === void 0 ? void 0 : _a.addEventListener("abort", maybeAbort);
+            const innerHandler = new Proxy(this.inner, {
+                apply: (target, thisArg, args) => {
+                    const [req, metadata] = args;
+                    if (metadata === null || metadata === void 0 ? void 0 : metadata.isSideEffect)
+                        innerCompleted = true;
+                    const abortListeners = [];
+                    signal.addEventListener = new Proxy(signal.addEventListener, {
+                        apply: (target, thisArg, args) => {
+                            abortListeners.push(args[1]);
+                            return Reflect.apply(target, thisArg, args);
+                        },
+                    });
+                    const cleanupAndMarkComplete = () => {
+                        var _a;
+                        (_a = metadata === null || metadata === void 0 ? void 0 : metadata.signal) === null || _a === void 0 ? void 0 : _a.removeEventListener("abort", maybeAbort);
+                        abortListeners.forEach((listener) => signal.removeEventListener("abort", listener));
+                        innerCompleted = true;
+                    };
+                    const innerResponse = Reflect.apply(target, thisArg, [
+                        req,
+                        Object.assign(Object.assign({}, metadata), { isSideEffect: false, signal }),
+                    ]);
+                    innerResponse.catch(() => { }).then(cleanupAndMarkComplete);
+                    return innerResponse;
+                },
+            });
+            const outerResponse = outer(innerHandler)(req, metadata);
+            outerResponse.catch(() => { }).then(maybeAbort);
+            return outerResponse;
+        };
+        return new HandlerChainBuilder(outerHandler);
+    }
+}
+//# sourceMappingURL=HandlerChainBuilder.js.map
 ;// ./node_modules/@snap/camera-kit/dist/handlers/retryingHandler.js
 
 
@@ -2246,44 +2269,44 @@ function ensureClonedRequest(input) {
 const createRetryingHandler = (options = {}) => {
     const definedOptions = copyDefinedProperties(options);
     const { backoffMultiple, baseSleep, maxSleep, maxRetries, retryPredicate } = Object.assign(Object.assign({}, defaultOptions), definedOptions);
-    let retryCount = -1;
     const jitterSleep = (priorSleep) => tslib_es6_awaiter(void 0, void 0, void 0, function* () {
         const nextSleep = Math.min(maxSleep, randomInRange(baseSleep, priorSleep * backoffMultiple));
         yield sleep(nextSleep);
         return nextSleep;
     });
-    const makeRequestAttempt = (next, priorSleep = baseSleep) => (req, metadata) => tslib_es6_awaiter(void 0, void 0, void 0, function* () {
-        var _a, _b;
-        retryCount++;
-        try {
-            const response = yield next(ensureClonedRequest(req), metadata);
-            if (retryCount < maxRetries && retryPredicate(response, retryCount)) {
-                const nextSleep = yield jitterSleep(priorSleep);
-                if ((_a = metadata === null || metadata === void 0 ? void 0 : metadata.signal) === null || _a === void 0 ? void 0 : _a.aborted)
-                    return response;
-                logRetry(response, nextSleep);
-                return makeRequestAttempt(next, nextSleep)(req, metadata);
+    return (next) => (req, metadata) => {
+        const attemptFn = (priorSleep, retryCount) => (() => tslib_es6_awaiter(void 0, void 0, void 0, function* () {
+            var _a, _b;
+            try {
+                const response = yield next(ensureClonedRequest(req), metadata);
+                if (retryCount < maxRetries && retryPredicate(response, retryCount)) {
+                    const nextSleep = yield jitterSleep(priorSleep);
+                    if ((_a = metadata === null || metadata === void 0 ? void 0 : metadata.signal) === null || _a === void 0 ? void 0 : _a.aborted)
+                        return response;
+                    logRetry(response, nextSleep);
+                    return attemptFn(nextSleep, retryCount + 1);
+                }
+                return response;
             }
-            return response;
-        }
-        catch (error) {
-            if (!(error instanceof Error)) {
-                throw new Error("Invalid type caught by retrying handler. Handlers may only throw Errors. Got " +
-                    `${JSON.stringify(error)}`);
-            }
-            if (error.name === "AbortError")
-                throw error;
-            if (retryCount < maxRetries && retryPredicate(error, retryCount)) {
-                const nextSleep = yield jitterSleep(priorSleep);
-                if ((_b = metadata === null || metadata === void 0 ? void 0 : metadata.signal) === null || _b === void 0 ? void 0 : _b.aborted)
+            catch (error) {
+                if (!(error instanceof Error)) {
+                    throw new Error("Invalid type caught by retrying handler. Handlers may only throw Errors. Got " +
+                        `${JSON.stringify(error)}`);
+                }
+                if (error.name === "AbortError")
                     throw error;
-                logRetry(error, nextSleep);
-                return makeRequestAttempt(next, nextSleep)(req, metadata);
+                if (retryCount < maxRetries && retryPredicate(error, retryCount)) {
+                    const nextSleep = yield jitterSleep(priorSleep);
+                    if ((_b = metadata === null || metadata === void 0 ? void 0 : metadata.signal) === null || _b === void 0 ? void 0 : _b.aborted)
+                        throw error;
+                    logRetry(error, nextSleep);
+                    return attemptFn(nextSleep, retryCount + 1);
+                }
+                throw error;
             }
-            throw error;
-        }
-    });
-    return (next) => makeRequestAttempt(next);
+        }))();
+        return attemptFn(baseSleep, 0);
+    };
 };
 //# sourceMappingURL=retryingHandler.js.map
 ;// ./node_modules/@snap/camera-kit/dist/handlers/noCorsRetryingFetchHandler.js
@@ -2475,11 +2498,13 @@ const remoteMediaAssetLoaderFactory = Injectable("remoteMediaAssetLoader", [defa
 //# sourceMappingURL=remoteMediaAssetLoaderFactory.js.map
 ;// ./node_modules/rxjs/dist/esm5/internal/util/EmptyError.js
 
-var EmptyError = createErrorClass(function (_super) { return function EmptyErrorImpl() {
-    _super(this);
-    this.name = 'EmptyError';
-    this.message = 'no elements in sequence';
-}; });
+var EmptyError = createErrorClass(function (_super) {
+    return function EmptyErrorImpl() {
+        _super(this);
+        this.name = 'EmptyError';
+        this.message = 'no elements in sequence';
+    };
+});
 //# sourceMappingURL=EmptyError.js.map
 ;// ./node_modules/rxjs/dist/esm5/internal/firstValueFrom.js
 
@@ -7188,13 +7213,13 @@ function memoize_memoize(delegate) {
 }
 //# sourceMappingURL=memoize.js.map
 ;// ./node_modules/@snap/camera-kit/dist/environment.js
-/* harmony default export */ const environment = ({ PACKAGE_VERSION: "1.1.0" });
+/* harmony default export */ const environment = ({ PACKAGE_VERSION: "1.13.0" });
 //# sourceMappingURL=environment.js.map
 ;// ./node_modules/@snap/camera-kit/dist/lensCoreWasmVersions.js
 /* harmony default export */ const lensCoreWasmVersions = ({
-    version: "290",
-    buildNumber: "458",
-    baseUrl: "https://cf-st.sc-cdn.net/d/eQXoian2N4dHEfwVBdANc?go=IgsKCTIBBEgBUFxgAQ%3D%3D&uc=92",
+    version: "340",
+    buildNumber: "c72c304",
+    baseUrl: "https://cf-st.sc-cdn.net/d/TvlAaIV4wTo2ALOwTdssh?go=IgsKCTIBBEgBUFxgAQ%3D%3D&uc=92",
 });
 //# sourceMappingURL=lensCoreWasmVersions.js.map
 ;// ./node_modules/@snap/camera-kit/dist/platform/platformInfo.js
@@ -7323,7 +7348,7 @@ function normalizeUserAgentData(userAgentData) {
         platform: parseOSName(userAgentData.platform),
     };
 }
-const getPlatformInfo = memoize_memoize(function getPlatformIno() {
+const getPlatformInfo = memoize_memoize(function getPlatformInfo() {
     var _a, _b, _c;
     const userAgent = navigator.userAgent;
     const userAgentData = isNavigatorUAData(navigator.userAgentData)
@@ -7718,7 +7743,7 @@ function messageClass(message, data) {
     };
 }
 function createTsProtoClient(serviceDefinition, handler) {
-    return entries_fromEntries(entries_entries(serviceDefinition.methods).map(([methodName, methodDefinition]) => {
+    return fromEntries(entries(serviceDefinition.methods).map(([methodName, methodDefinition]) => {
         return [
             methodName,
             (request) => tslib_es6_awaiter(this, void 0, void 0, function* () {
@@ -18849,6 +18874,16 @@ class RemoteConfiguration {
     getInitializationConfig() {
         return this.initializationConfig;
     }
+    getGpuIndexConfig() {
+        const lensClusterConfigName = "LENS_FEATURE_GPU_INDEX";
+        return this.get(lensClusterConfigName).pipe(map((configResults) => {
+            var _a, _b;
+            if (configResults.length === 0) {
+                throw new Error(`Cannot find '${lensClusterConfigName}' config.`);
+            }
+            return (_b = (_a = configResults[0].value) === null || _a === void 0 ? void 0 : _a.intValue) !== null && _b !== void 0 ? _b : -1;
+        }), shareReplay(1));
+    }
     getNamespace(namespace) {
         return this.configById.pipe(map((configs) => {
             const namespaceConfigs = Array.from(configs.values())
@@ -18874,6 +18909,8 @@ const remoteConfigurationFactory = Injectable("remoteConfiguration", [configurat
 
 
 
+
+const deviceDependentAssetLoader_logger = getLogger("deviceDependentAssetLoader");
 const hasStringValue = (value) => {
     return typeguards_isRecord(value) && typeguards_isString(value.stringValue);
 };
@@ -18903,6 +18940,7 @@ const deviceDependentAssetLoaderFactory = Injectable("deviceDependentAssetLoader
                 }
                 if (!isAssetConfig(assetConfig))
                     throw loadingFailed("COF config malformed (missing URL)");
+                deviceDependentAssetLoader_logger.info(`COF request for ${assetId}. url: ${assetConfig.url}. checksum: ${assetConfig.checksum}.`);
                 return assetConfig;
             }), mergeMap(({ url, checksum }) => tslib_es6_awaiter(this, void 0, void 0, function* () {
                 const [data, response] = yield assetHandler(url, withRequestPriority({ cache: "force-cache" }, lowPriority));
@@ -18987,10 +19025,12 @@ const promisifiableMethods = {
     setAudioParameters: null,
     setDeviceClass: null,
     setFPSLimit: null,
+    setGpuIndex: null,
     setInputTransform: null,
     setOnFrameProcessedCallback: null,
     setRenderLoopMode: null,
     setRenderSize: null,
+    setScreenRegions: null,
     teardown: null,
     useMediaElement: null,
     yuvBufferToBitmap: null,
@@ -19261,6 +19301,37 @@ const createCustomLensCoreHandler = () => {
     };
 };
 //# sourceMappingURL=customLensCoreHandler.js.map
+;// ./node_modules/@snap/camera-kit/dist/trusted-types/trustedTypesHandler.js
+const handlers = new Map();
+function getTrustedTypesHandler(trustedTypesPolicyName) {
+    const cached = handlers.get(trustedTypesPolicyName);
+    if (cached)
+        return cached;
+    const handler = createHandler(trustedTypesPolicyName);
+    handlers.set(trustedTypesPolicyName, handler);
+    return handler;
+}
+function createHandler(trustedTypesPolicyName) {
+    const trustedUrls = new Set();
+    const trustedTypes = globalThis.trustedTypes;
+    const policy = trustedTypes === null || trustedTypes === void 0 ? void 0 : trustedTypes.createPolicy(trustedTypesPolicyName, {
+        createScriptURL: (url) => {
+            if (trustedUrls.has(url))
+                return url;
+            throw new TypeError("Blocked by Trusted Types: " + url);
+        },
+    });
+    return {
+        policyName: trustedTypesPolicyName,
+        getTrustedUrls: () => [...trustedUrls],
+        trustUrl: (url) => {
+            var _a;
+            trustedUrls.add(url);
+            return (_a = policy === null || policy === void 0 ? void 0 : policy.createScriptURL(url)) !== null && _a !== void 0 ? _a : url;
+        },
+    };
+}
+//# sourceMappingURL=trustedTypesHandler.js.map
 ;// ./node_modules/wasm-feature-detect/dist/esm/index.js
 const bigInt=()=>(async e=>{try{return(await WebAssembly.instantiate(e)).instance.exports.b(BigInt(0))===BigInt(0)}catch(e){return!1}})(new Uint8Array([0,97,115,109,1,0,0,0,1,6,1,96,1,126,1,126,3,2,1,0,7,5,1,1,98,0,0,10,6,1,4,0,32,0,11])),bulkMemory=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,5,3,1,0,1,10,14,1,12,0,65,0,65,0,65,0,252,10,0,0,11])),exceptions=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,8,1,6,0,6,64,25,11,11])),exceptionsFinal=()=>(async()=>{try{return new WebAssembly.Module(Uint8Array.from(atob("AGFzbQEAAAABBAFgAAADAgEAChABDgACaR9AAQMAAAsACxoL"),(e=>e.codePointAt(0)))),!0}catch(e){return!1}})(),extendedConst=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,3,1,0,1,11,9,1,0,65,1,65,2,106,11,0])),gc=()=>(async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,95,1,120,0])))(),jsStringBuiltins=()=>(async()=>{try{return await WebAssembly.instantiate(Uint8Array.from(atob("AGFzbQEAAAABBgFgAW8BfwIXAQ53YXNtOmpzLXN0cmluZwR0ZXN0AAA="),(e=>e.codePointAt(0))),{},{builtins:["js-string"]}),!0}catch(e){return!1}})(),jspi=()=>(async()=>"Suspending"in WebAssembly)(),memory64=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,3,1,4,1])),multiMemory=()=>(async()=>{try{return new WebAssembly.Module(new Uint8Array([0,97,115,109,1,0,0,0,5,5,2,0,0,0,0])),!0}catch(e){return!1}})(),multiValue=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,6,1,96,0,2,127,127,3,2,1,0,10,8,1,6,0,65,0,65,0,11])),mutableGlobals=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,2,8,1,1,97,1,98,3,127,1,6,6,1,127,1,65,0,11,7,5,1,1,97,3,1])),referenceTypes=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,7,1,5,0,208,112,26,11])),esm_relaxedSimd=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,15,1,13,0,65,1,253,15,65,2,253,15,253,128,2,11])),saturatedFloatToInt=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,12,1,10,0,67,0,0,0,0,252,0,26,11])),signExtensions=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,8,1,6,0,65,0,192,26,11])),esm_simd=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11])),streamingCompilation=()=>(async()=>"compileStreaming"in WebAssembly)(),tailCall=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,6,1,4,0,18,0,11])),threads=()=>(async e=>{try{return"undefined"!=typeof MessageChannel&&(new MessageChannel).port1.postMessage(new SharedArrayBuffer(1)),WebAssembly.validate(e)}catch(e){return!1}})(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,5,4,1,3,1,1,10,11,1,9,0,65,0,254,16,2,0,26,11])),typeReflection=()=>(async()=>"Function"in WebAssembly)(),typedFunctionReferences=()=>(async()=>{try{return new WebAssembly.Module(Uint8Array.from(atob("AGFzbQEAAAABEANgAX8Bf2ABZAABf2AAAX8DBAMBAAIJBQEDAAEBChwDCwBBCkEqIAAUAGoLBwAgAEEBagsGANIBEAAL"),(e=>e.codePointAt(0)))),!0}catch(e){return!1}})();
 
@@ -19302,20 +19373,18 @@ function getWebAssemblyCapabilities() {
                 supported: false,
                 error: platformNotSupportedError("CameraKit requires WebAssembly, but this browser does not support WebAssembly."),
             };
-        const [simd, exceptionHandling, relaxedSimd] = yield Promise.all([
+        const [simd, relaxedSimd] = yield Promise.all([
             esm_simd().then((simd) => {
                 if (getPlatformInfo().browser.brand === "Safari")
                     return false;
                 return simd;
             }),
-            exceptions(),
             esm_relaxedSimd(),
         ]);
         return {
             supported: true,
             wasmFeatures: {
                 simd,
-                exceptionHandling,
                 relaxedSimd,
             },
         };
@@ -19368,24 +19437,16 @@ const getPlatformCapabilities = memoize_memoize(function getPlatformCapabilities
 
 
 const wasmAssets = ["LensCoreWebAssembly.js", "LensCoreWebAssembly.wasm"];
-function getBuildFlavor({ simd, exceptionHandling, relaxedSimd }, buildNumber) {
-    const relaxedBuildAvailable = parseInt(buildNumber) >= Number.MAX_SAFE_INTEGER;
+function getBuildFlavor({ simd, relaxedSimd }, versionNumber) {
+    const relaxedBuildAvailable = parseInt(versionNumber) >= 282;
     if (relaxedBuildAvailable && relaxedSimd) {
         return "rel-relaxed-simd-neh";
     }
     else if (simd) {
-        if (exceptionHandling) {
-            return "rel-simd-neh";
-        }
-        else {
-            return "release-simd";
-        }
-    }
-    else if (exceptionHandling) {
-        return "rel-neh";
+        return "rel-simd-neh";
     }
     else {
-        return "release";
+        return "rel-neh";
     }
 }
 function getRequiredBootstrapURLs(endpointOverride) {
@@ -19397,7 +19458,7 @@ function getRequiredBootstrapURLs(endpointOverride) {
         const { lensCore } = getPlatformInfo();
         const version = lensCore.version;
         const buildNumber = lensCore.buildNumber;
-        const flavor = getBuildFlavor(wasm.wasmFeatures, buildNumber);
+        const flavor = getBuildFlavor(wasm.wasmFeatures, version);
         return wasmAssets.map((asset) => {
             if (endpoint)
                 return `${endpoint}/${asset}`;
@@ -19420,11 +19481,12 @@ function getRequiredBootstrapURLs(endpointOverride) {
 
 
 
+
 const lensCoreFactory_logger = getLogger("lensCoreFactory");
 const findMatch = (regex, strings) => strings.find((s) => regex.test(s));
 const LENS_CORE_JS_REQUEST_TYPE = "lens_core_js";
 const LENS_CORE_WASM_REQUEST_TYPE = "lens_core_wasm";
-const lensCoreFactory = Injectable("lensCore", [defaultFetchHandlerFactory.token, configurationToken, requestStateEventTargetFactory.token], (handler, { lensCoreOverrideUrls, wasmEndpointOverride }, requestStateEventTarget) => tslib_es6_awaiter(void 0, void 0, void 0, function* () {
+const lensCoreFactory = Injectable("lensCore", [defaultFetchHandlerFactory.token, configurationToken, requestStateEventTargetFactory.token], (handler, { lensCoreOverrideUrls, wasmEndpointOverride, trustedTypesPolicyName }, requestStateEventTarget) => tslib_es6_awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     let lensCoreJS;
     let lensCoreWASM;
@@ -19434,8 +19496,9 @@ const lensCoreFactory = Injectable("lensCore", [defaultFetchHandlerFactory.token
         lensCoreHandlerChainBuilder = lensCoreHandlerChainBuilder.map(createCustomLensCoreHandler());
     }
     const lensCoreHandler = lensCoreHandlerChainBuilder.map(createRequestStateEmittingHandler(requestStateEventTarget)).handler;
+    const trustedTypesHandler = getTrustedTypesHandler(trustedTypesPolicyName);
     if (lensCoreOverrideUrls) {
-        lensCoreJS = lensCoreOverrideUrls.js;
+        lensCoreJS = trustedTypesHandler.trustUrl(lensCoreOverrideUrls.js);
         lensCoreWASM = lensCoreOverrideUrls.wasm;
     }
     else {
@@ -19450,14 +19513,14 @@ const lensCoreFactory = Injectable("lensCore", [defaultFetchHandlerFactory.token
         const glueScript = yield lensCoreHandler([
             lensCoreJS,
             { requestType: LENS_CORE_JS_REQUEST_TYPE, customBuild: `${customBuild}` },
-        ]).then((r) => r.blob());
-        lensCoreJS = URL.createObjectURL(glueScript);
+        ]);
+        lensCoreJS = trustedTypesHandler.trustUrl(URL.createObjectURL(yield glueScript.blob()));
     }
     const scriptElement = yield loadScript(lensCoreJS);
     const lensCore = yield new Promise((resolve, reject) => {
         let initialModule;
         const moduleInit = globalThis.createLensesModule((initialModule = {
-            mainScriptUrlOrBlob: lensCoreJS,
+            mainScriptUrlOrBlob: lensCoreJS.toString(),
             instantiateWasm: (importObject, receiveInstance) => {
                 WebAssembly.instantiateStreaming(lensCoreHandler([
                     lensCoreWASM,
@@ -23473,7 +23536,7 @@ let CameraKitSource_CameraKitSource = (() => {
                 this.subscriber = subscriber;
                 this.deviceInfo = Object.assign(Object.assign({}, defaultDeviceInfo), copyDefinedProperties(deviceInfo));
             }
-            attach(lensCore, reportError) {
+            attach(lensCore, frameEvents, reportError) {
                 return tslib_es6_awaiter(this, void 0, void 0, function* () {
                     if (this.lensCore) {
                         throw new Error("This CameraKitSource has already been attached to this CameraKitSession " +
@@ -23494,7 +23557,7 @@ let CameraKitSource_CameraKitSource = (() => {
                     yield lensCore.setFPSLimit({ fps });
                     yield lensCore.setRenderSize({ mode: "matchInputResolution" });
                     if (this.subscriber.onAttach)
-                        yield this.subscriber.onAttach(this, lensCore, reportError);
+                        yield this.subscriber.onAttach(this, lensCore, reportError, frameEvents);
                 });
             }
             copy(deviceInfo = {}) {
@@ -24042,26 +24105,30 @@ let LensPerformanceMetrics = (() => {
     let _instanceExtraInitializers = [];
     let _beginMeasurement_decorators;
     return _a = class LensPerformanceMetrics {
-            constructor(lensCore) {
-                this.lensCore = (__runInitializers(this, _instanceExtraInitializers), lensCore);
+            constructor(frameEvents) {
+                this.measurementInstances = (__runInitializers(this, _instanceExtraInitializers), void 0);
                 this.measurementInstances = new Set();
-                this.lensCore
-                    .setOnFrameProcessedCallback({
-                    onFrameProcessed: ({ processingTimeMs }) => {
+                this.subscription = frameEvents.subscribe({
+                    next: (frameEvent) => {
                         try {
                             for (const measurement of this.measurementInstances.values()) {
-                                measurement.update(processingTimeMs);
+                                measurement.update(frameEvent.processingTimeMs);
                             }
                         }
                         catch (error) {
                             LensPerformanceMetrics_logger.error(error);
                         }
                     },
-                })
-                    .catch((error) => LensPerformanceMetrics_logger.error(`Failed registering setOnFrameProcessedCallback with error: ${error.message}`));
+                    error: (error) => {
+                        LensPerformanceMetrics_logger.error(error);
+                    },
+                });
             }
             beginMeasurement() {
                 return new LensPerformanceMeasurement(this.measurementInstances);
+            }
+            destroy() {
+                this.subscription.unsubscribe();
             }
         },
         (() => {
@@ -25546,42 +25613,38 @@ const sessionStateFactory = Injectable("sessionState", () => createSessionState(
 
 
 
+
+const LensKeyboard_logger = getLogger("LensKeyboard");
 class LensKeyboard {
     constructor(lensState) {
         this.lensState = lensState;
         this.active = false;
-        this.element = document.createElement("textarea");
-        this.element.addEventListener("keypress", (event) => {
-            if (event.code === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                this.handleReply(this.element.value);
-            }
-        });
+        this.text = undefined;
+        this.reply = () => { };
+        this.onElementKeyPress = this.onElementKeyPress.bind(this);
         this.events = new TypedEventTarget();
-        this.handleReply = () => { };
+        this.element = document.createElement("textarea");
+        this.element.addEventListener("keypress", this.onElementKeyPress);
         this.uriHandler = {
-            uri: "app://textInput/requestKeyboard",
-            handleRequest: (_request, reply) => {
-                this.element.autofocus = true;
-                this.handleReply = (text) => {
-                    const opt = {
-                        text: text,
-                        start: text.length,
-                        end: text.length,
-                        done: true,
-                        shouldNotify: true,
-                    };
-                    const output = new TextEncoder().encode(JSON.stringify(opt));
-                    reply({
-                        code: 200,
-                        description: "",
-                        contentType: "application/json",
-                        data: output,
-                    });
-                };
-                this.active = true;
-                this.updateStatus();
-                this.element.focus();
+            uri: "app://textInput/",
+            handleRequest: (request, reply) => {
+                if (request.uri === "app://textInput/requestKeyboard") {
+                    const data = JSON.parse(new TextDecoder().decode(request.data));
+                    this.element.value = data.text;
+                    this.text = data.text;
+                    this.reply = reply;
+                    this.active = true;
+                    this.notifyClient();
+                    this.element.focus();
+                }
+                else if (request.uri === "app://textInput/dismissKeyboard") {
+                    this.active = false;
+                    this.sendReply({ keyboardOpen: false });
+                    this.notifyClient();
+                }
+                else {
+                    LensKeyboard_logger.error(new Error(`Unhandled lens keyboard request '${request.uri}'.`));
+                }
             },
         };
         lensState.events.pipe(forActions("turnedOff")).subscribe(() => {
@@ -25589,18 +25652,25 @@ class LensKeyboard {
         });
     }
     dismiss() {
-        if (this.active) {
-            this.active = false;
-            this.element.value = "";
-            this.updateStatus();
-        }
+        this.active = false;
+        this.element.value = "";
+        this.text = "";
+        this.sendReply({ keyboardOpen: false });
+        this.notifyClient();
     }
     getElement() {
         return this.element;
     }
     sendInputToLens(text) {
         this.element.value = text;
-        this.handleReply(text);
+        this.text = text;
+        this.sendReply({
+            text: text,
+            start: text.length,
+            end: text.length,
+            done: true,
+            shouldNotify: true,
+        });
     }
     addEventListener(type, callback, options) {
         this.events.addEventListener(type, callback, options);
@@ -25612,20 +25682,39 @@ class LensKeyboard {
         return {
             addEventListener: this.addEventListener.bind(this),
             removeEventListener: this.removeEventListener.bind(this),
-            getElement: this.getElement.bind(this),
             sendInputToLens: this.sendInputToLens.bind(this),
             dismiss: this.dismiss.bind(this),
+            getElement: this.getElement.bind(this),
         };
     }
-    updateStatus() {
+    destroy() {
+        this.element.removeEventListener("keypress", this.onElementKeyPress);
+    }
+    sendReply(data) {
+        this.reply({
+            code: 200,
+            description: "",
+            contentType: "application/json",
+            data: new TextEncoder().encode(JSON.stringify(data)),
+        });
+    }
+    notifyClient() {
+        var _a;
         const state = this.lensState.getState();
         if (isState(state, "noLensApplied"))
             return;
         this.events.dispatchEvent(new TypedCustomEvent("active", {
             element: this.element,
             active: this.active,
+            text: (_a = this.text) !== null && _a !== void 0 ? _a : "",
             lens: state.data,
         }));
+    }
+    onElementKeyPress(event) {
+        if (event.code === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            this.sendInputToLens(this.element.value);
+        }
     }
 }
 const lensKeyboardFactory = Injectable("lensKeyboard", [lensStateFactory.token], (lensState) => new LensKeyboard(lensState));
@@ -25646,7 +25735,91 @@ function isPublicLensError(value) {
     }
 }
 //# sourceMappingURL=CameraKitSessionEvents.js.map
+;// ./node_modules/@snap/camera-kit/dist/session/frameEvents.js
+
+
+
+
+const frameEvents_logger = getLogger("FrameEvents");
+const frameEventsFactory = Injectable("frameEvents", [lensCoreFactory.token], (lensCore) => {
+    const frameEventsSubject = new Subject();
+    lensCore
+        .setOnFrameProcessedCallback({
+        onFrameProcessed: (frameEvent) => {
+            frameEventsSubject.next(frameEvent);
+        },
+    })
+        .catch((error) => frameEvents_logger.error(`Failed registering setOnFrameProcessedCallback with error: ${error.message}`));
+    return frameEventsSubject.asObservable();
+});
+//# sourceMappingURL=frameEvents.js.map
+;// ./node_modules/@snap/camera-kit/dist/session/screenRegions.js
+
+const REGION_TYPE_MAPPING = {
+    roundButton: "round_button",
+    topBar: "top_bar",
+    keyboard: "keyboard",
+    safeRender: "safe_render",
+    captureExitButton: "capture_exit_button",
+};
+function isScreenRegions(value) {
+    if (!typeguards_isRecord(value))
+        return false;
+    for (const [key, rect] of Object.entries(value)) {
+        if (!(key in REGION_TYPE_MAPPING))
+            return false;
+        if (!isNormalizedRectLike(rect))
+            return false;
+    }
+    return true;
+}
+const EPS = 1e-6;
+const isFiniteNumber = (v) => typeof v === "number" && Number.isFinite(v);
+function isNormalizedRectLike(obj) {
+    if (!typeguards_isRecord(obj))
+        return false;
+    const x = obj.x;
+    const y = obj.y;
+    const width = obj.width;
+    const height = obj.height;
+    if (![x, y, width, height].every(isFiniteNumber))
+        return false;
+    if (width < 0 || height < 0)
+        return false;
+    const x2 = x + width;
+    const y2 = y + height;
+    if (x < -EPS || y < -EPS)
+        return false;
+    if (x > 1 + EPS || y > 1 + EPS)
+        return false;
+    if (x2 > 1 + EPS || y2 > 1 + EPS)
+        return false;
+    return true;
+}
+function prepareScreenRegionsUpdate(newRegions) {
+    const mappedRegions = {};
+    for (const [regionType, region] of Object.entries(newRegions)) {
+        const lensCoreRegionType = REGION_TYPE_MAPPING[regionType];
+        mappedRegions[lensCoreRegionType] = {
+            normalizedRect: {
+                origin: {
+                    x: region.x,
+                    y: region.y,
+                },
+                size: {
+                    width: region.width,
+                    height: region.height,
+                },
+            },
+        };
+    }
+    return mappedRegions;
+}
+//# sourceMappingURL=screenRegions.js.map
 ;// ./node_modules/@snap/camera-kit/dist/session/CameraKitSession.js
+
+
+
 
 
 
@@ -25695,14 +25868,17 @@ let CameraKitSession_CameraKitSession = (() => {
     let _unmute_decorators;
     let _setSource_decorators;
     let _setFPSLimit_decorators;
+    let _setScreenRegions_decorators;
     let _destroy_decorators;
     return _a = class CameraKitSession {
-            constructor(keyboard, lensCore, sessionState, lensState, logEntries, pageVisibility) {
-                this.keyboard = (__runInitializers(this, _instanceExtraInitializers), keyboard);
+            constructor(innerKeyboard, lensCore, sessionState, lensState, logEntries, pageVisibility, frameEvents) {
+                this.innerKeyboard = (__runInitializers(this, _instanceExtraInitializers), innerKeyboard);
                 this.lensCore = lensCore;
                 this.sessionState = sessionState;
                 this.lensState = lensState;
+                this.frameEvents = frameEvents;
                 this.events = new TypedEventTarget();
+                this.keyboard = innerKeyboard.toPublicInterface();
                 const outputs = this.lensCore.getOutputCanvases();
                 this.output = {
                     live: outputs[this.lensCore.CanvasType.Preview.value],
@@ -25712,7 +25888,7 @@ let CameraKitSession_CameraKitSession = (() => {
                     live: false,
                     capture: false,
                 };
-                this.metrics = new LensPerformanceMetrics(this.lensCore);
+                this.metrics = new LensPerformanceMetrics(frameEvents);
                 const removeOnHidden = pageVisibility.onPageHidden(() => this.sessionState.dispatch("suspend", this));
                 const removeOnVisible = pageVisibility.onPageVisible(() => this.sessionState.dispatch("resume", this));
                 this.removePageVisibilityHandlers = () => {
@@ -25807,7 +25983,7 @@ let CameraKitSession_CameraKitSession = (() => {
                         live: false,
                         capture: false,
                     };
-                    yield cameraKitSource.attach(this.lensCore, (error) => {
+                    yield cameraKitSource.attach(this.lensCore, this.frameEvents, (error) => {
                         CameraKitSession_logger.error(cameraKitSourceError("Error occurred during source attachment.", error));
                     });
                     this.source = cameraKitSource;
@@ -25824,6 +26000,13 @@ let CameraKitSession_CameraKitSession = (() => {
                     return this.lensCore.setFPSLimit({ fps });
                 });
             }
+            setScreenRegions(regions) {
+                return tslib_es6_awaiter(this, void 0, void 0, function* () {
+                    yield this.lensCore.setScreenRegions({
+                        regions: prepareScreenRegionsUpdate(regions),
+                    });
+                });
+            }
             destroy() {
                 return tslib_es6_awaiter(this, void 0, void 0, function* () {
                     try {
@@ -25837,6 +26020,8 @@ let CameraKitSession_CameraKitSession = (() => {
                     yield this.safelyDetachSource();
                     this.removePageVisibilityHandlers();
                     this.sessionState.dispatch("destroy", undefined);
+                    this.innerKeyboard.destroy();
+                    this.metrics.destroy();
                 });
             }
             renderTargetToCanvasType(target) {
@@ -25866,6 +26051,7 @@ let CameraKitSession_CameraKitSession = (() => {
             _unmute_decorators = [errorLoggingDecorator(CameraKitSession_logger)];
             _setSource_decorators = [validate_validate(isAllowedSource, isPartialCameraKitDeviceOptionsOrUndefined), errorLoggingDecorator(CameraKitSession_logger)];
             _setFPSLimit_decorators = [validate_validate(isValidNumber), errorLoggingDecorator(CameraKitSession_logger)];
+            _setScreenRegions_decorators = [validate_validate(isScreenRegions), errorLoggingDecorator(CameraKitSession_logger)];
             _destroy_decorators = [errorLoggingDecorator(CameraKitSession_logger)];
             __esDecorate(_a, null, _applyLens_decorators, { kind: "method", name: "applyLens", static: false, private: false, access: { has: obj => "applyLens" in obj, get: obj => obj.applyLens } }, null, _instanceExtraInitializers);
             __esDecorate(_a, null, _removeLens_decorators, { kind: "method", name: "removeLens", static: false, private: false, access: { has: obj => "removeLens" in obj, get: obj => obj.removeLens } }, null, _instanceExtraInitializers);
@@ -25875,6 +26061,7 @@ let CameraKitSession_CameraKitSession = (() => {
             __esDecorate(_a, null, _unmute_decorators, { kind: "method", name: "unmute", static: false, private: false, access: { has: obj => "unmute" in obj, get: obj => obj.unmute } }, null, _instanceExtraInitializers);
             __esDecorate(_a, null, _setSource_decorators, { kind: "method", name: "setSource", static: false, private: false, access: { has: obj => "setSource" in obj, get: obj => obj.setSource } }, null, _instanceExtraInitializers);
             __esDecorate(_a, null, _setFPSLimit_decorators, { kind: "method", name: "setFPSLimit", static: false, private: false, access: { has: obj => "setFPSLimit" in obj, get: obj => obj.setFPSLimit } }, null, _instanceExtraInitializers);
+            __esDecorate(_a, null, _setScreenRegions_decorators, { kind: "method", name: "setScreenRegions", static: false, private: false, access: { has: obj => "setScreenRegions" in obj, get: obj => obj.setScreenRegions } }, null, _instanceExtraInitializers);
             __esDecorate(_a, null, _destroy_decorators, { kind: "method", name: "destroy", static: false, private: false, access: { has: obj => "destroy" in obj, get: obj => obj.destroy } }, null, _instanceExtraInitializers);
         })(),
         _a;
@@ -25887,7 +26074,8 @@ const cameraKitSessionFactory = Injectable("CameraKitSession", [
     sessionStateFactory.token,
     lensStateFactory.token,
     pageVisibilityFactory.token,
-], (lensCore, logEntries, keyboard, sessionState, lensState, pageVisibility) => new CameraKitSession_CameraKitSession(keyboard, lensCore, sessionState, lensState, logEntries, pageVisibility));
+    frameEventsFactory.token,
+], (lensCore, logEntries, keyboard, sessionState, lensState, pageVisibility, frameEvents) => new CameraKitSession_CameraKitSession(keyboard, lensCore, sessionState, lensState, logEntries, pageVisibility, frameEvents));
 //# sourceMappingURL=CameraKitSession.js.map
 ;// ./node_modules/@snap/camera-kit/dist/lens/assets/LensAssetsProvider.js
 
@@ -25910,13 +26098,13 @@ const registerLensAssetsProvider = Injectable("registerLensAssetsProvider", [
     const consecutiveErrorsPerAsset = new Map();
     lensCore.setRemoteAssetsProvider((assetDescriptor) => tslib_es6_awaiter(void 0, void 0, void 0, function* () {
         var _a, _b, _c, _d, _e;
-        const { assetId, assetType, effectId } = assetDescriptor;
+        const { assetId, assetType, lensId } = assetDescriptor;
         try {
             if (((_a = consecutiveErrorsPerAsset.get(assetId)) !== null && _a !== void 0 ? _a : 0) > maxConsecutiveErrors) {
                 throw new Error(`Maximum consecutive asset load errors reached for asset ${assetId}`);
             }
-            const lensId = effectId !== null && effectId !== void 0 ? effectId : (_b = lensState.getState().data) === null || _b === void 0 ? void 0 : _b.id;
-            const lens = lensId ? lensRepository.getLensMetadata(lensId) : undefined;
+            const calculatedLensId = lensId !== null && lensId !== void 0 ? lensId : (_b = lensState.getState().data) === null || _b === void 0 ? void 0 : _b.id;
+            const lens = calculatedLensId ? lensRepository.getLensMetadata(calculatedLensId) : undefined;
             yield lensAssetRepository.loadAsset({
                 assetDescriptor,
                 lens: lens && toPublicLens(lens),
@@ -26544,22 +26732,23 @@ function createUriRequestProcessor({ uri, lensState, sessionState, createLensReq
 const requestValidationErrorName = "RequestValidationError";
 const requestValidationError = namedError(requestValidationErrorName);
 function validateRequest(request, specs) {
-    var _a, _b, _c;
+    var _a;
+    const url = new URL(request.uri);
     for (const spec of specs) {
-        const url = `${spec.tlsRequired ? "https://" : "http://"}${spec.host}`;
-        if (!request.uri.startsWith(url))
+        if (url.host !== spec.host || url.protocol !== (spec.tlsRequired ? "https:" : "http:")) {
             continue;
-        const path = ((_a = request.uri.split(url)[1]) !== null && _a !== void 0 ? _a : "").replace(/^\//, "").replace(/\/$/, "");
+        }
+        const path = url.pathname.replace(/^\/|\/$/g, "");
         for (const endpoint of spec.endpoints) {
-            const endpointPath = endpoint.path.replace(/^\//, "").replace(/\/$/, "");
+            const endpointPath = endpoint.path.replace(/^\/|\/$/g, "");
             if (!path.startsWith(endpointPath))
                 continue;
-            const method = (_b = RemoteEndpoint_HttpRequestMethod[request.method]) !== null && _b !== void 0 ? _b : RemoteEndpoint_HttpRequestMethod.UNRECOGNIZED;
+            const method = (_a = RemoteEndpoint_HttpRequestMethod[request.method]) !== null && _a !== void 0 ? _a : RemoteEndpoint_HttpRequestMethod.UNRECOGNIZED;
             if (!endpoint.methods.includes(method))
                 continue;
-            validatePath((_c = path.split(endpointPath)[1]) !== null && _c !== void 0 ? _c : "", endpoint.parameters);
+            validatePath(path.split(endpointPath)[1], endpoint.parameters);
             validateHeaders(request.metadata, endpoint.parameters);
-            validateQuery(request.uri, endpoint.parameters);
+            validateQuery(url.searchParams, endpoint.parameters);
             return;
         }
     }
@@ -26584,7 +26773,12 @@ function validatePath(path, parameters) {
         }
         else if (param.optional) {
             if (paramNameComponent === param.name) {
-                paramIndex += 2;
+                if (paramValueComponent !== undefined) {
+                    paramIndex += 2;
+                }
+                else {
+                    paramIndex += 1;
+                }
             }
         }
         else {
@@ -26614,9 +26808,6 @@ function validateHeaders(headers, parameters) {
             }
         }
         else if (param.optional) {
-            if (headerValue != undefined && isEmptyString(headerValue)) {
-                throw requestValidationError(`Header '${param.name}' is present but empty. If provided, it should not be empty.`);
-            }
         }
         else {
             if (headerValue == undefined || isEmptyString(headerValue)) {
@@ -26625,9 +26816,7 @@ function validateHeaders(headers, parameters) {
         }
     }
 }
-function validateQuery(uri, parameters) {
-    const url = new URL(uri);
-    const queryParams = new URLSearchParams(url.search);
+function validateQuery(queryParams, parameters) {
     for (const param of parameters) {
         if (param.location !== RemoteParameter_ParameterLocation.QUERY)
             continue;
@@ -26639,10 +26828,6 @@ function validateQuery(uri, parameters) {
             }
         }
         else if (param.optional) {
-            if (paramValue != undefined && isEmptyString(paramValue)) {
-                throw requestValidationError(`Optional query parameter '${param.name}' is present but empty. ` +
-                    `If provided, it should not be empty.`);
-            }
         }
         else {
             if (paramValue == undefined || isEmptyString(paramValue)) {
@@ -26674,6 +26859,7 @@ const allowedResponseHeaders = [
     "Last-Modified",
     "Location",
 ];
+const requestHeadersToExclude = ["x-sc-lenses-remote-api-spec-id"];
 function createHttpUriHandler(lensState, sessionState, remoteApiSpecsClient, customLentFetchHandler) {
     let allowlistPromise = undefined;
     return createUriRequestProcessor({
@@ -26768,10 +26954,14 @@ function getErrorResponse(errorType, message) {
     };
 }
 function mapLensToFetchRequest({ uri, method, metadata, data }) {
+    const headers = new Headers(metadata);
+    for (const header of requestHeadersToExclude) {
+        headers.delete(header);
+    }
     return {
         url: uri,
         init: {
-            headers: metadata,
+            headers: Object.fromEntries(headers.entries()),
             body: method !== "GET" && method !== "HEAD" && method !== undefined ? data : undefined,
             method,
         },
@@ -28351,6 +28541,17 @@ const remoteApiServicesFactory = Injectable("remoteApiServices", () => {
     const remoteApiServices = [];
     return remoteApiServices;
 });
+function getFirstRequestHandler(services, remoteApiRequest, lens) {
+    for (const service of services) {
+        try {
+            return service.getRequestHandler(remoteApiRequest, lens);
+        }
+        catch (error) {
+            remoteApiUriHandler_logger.warn("Client's Remote API request handler factory threw an error.", error);
+        }
+    }
+    return undefined;
+}
 function createRemoteApiUriHandler(registeredServices, sessionState, lensState, lensRepository, metrics) {
     const registeredServiceMap = new Map();
     for (const service of registeredServices) {
@@ -28377,62 +28578,51 @@ function createRemoteApiUriHandler(registeredServices, sessionState, lensState, 
             const { route } = extractSchemeAndRoute(request.uri);
             const [specId, endpointIdWithQuery] = route.split("/").slice(2);
             const [endpointId] = endpointIdWithQuery.split("?");
-            if (!(state === null || state === void 0 ? void 0 : state.supportedSpecIds.has(specId)))
-                return;
-            if (!registeredServiceMap.has(specId))
-                return;
             const dimensions = { specId };
             const reportSingleCount = (name) => {
                 metrics.setOperationalMetrics(Count.count(joinMetricNames(["lens", "remote-api", name]), 1, dimensions));
             };
             reportSingleCount("requests");
+            if (!(state === null || state === void 0 ? void 0 : state.supportedSpecIds.has(specId)))
+                return;
             const remoteApiRequest = {
                 apiSpecId: specId,
                 body: request.data,
                 endpointId,
                 parameters: request.metadata,
             };
-            for (const service of (_a = registeredServiceMap.get(specId)) !== null && _a !== void 0 ? _a : []) {
-                let requestHandler = undefined;
-                try {
-                    requestHandler = service.getRequestHandler(remoteApiRequest, lens);
-                }
-                catch (error) {
-                    remoteApiUriHandler_logger.warn("Client's Remote API request handler factory threw an error.", error);
-                }
-                if (requestHandler) {
-                    reportSingleCount("handled-requests");
-                    let cancellationHandler = undefined;
+            let requestHandler = getFirstRequestHandler((_a = registeredServiceMap.get(specId)) !== null && _a !== void 0 ? _a : [], remoteApiRequest, lens);
+            if (!requestHandler)
+                return;
+            reportSingleCount("handled-requests");
+            let cancellationHandler = undefined;
+            try {
+                cancellationHandler = requestHandler((response) => {
+                    var _a;
+                    reportSingleCount("responses");
+                    const responseCode = (_a = statusToResponseCodeMap[response.status]) !== null && _a !== void 0 ? _a : ResponseCode.UNRECOGNIZED;
+                    const uriResponse = {
+                        code: uriResponseOkCode,
+                        description: "",
+                        contentType: apiBinaryContentType,
+                        data: response.body,
+                        metadata: Object.assign(Object.assign({}, response.metadata), { [apiResponseStatusHeader]: responseCodeToNumber(responseCode).toString() }),
+                    };
+                    reply(uriResponse);
+                });
+            }
+            catch (error) {
+                remoteApiUriHandler_logger.warn("Client's Remote API request handler threw an error.", error);
+            }
+            if (typeof cancellationHandler === "function") {
+                setCancellationHandler(() => {
                     try {
-                        cancellationHandler = requestHandler((response) => {
-                            var _a;
-                            reportSingleCount("responses");
-                            const responseCode = (_a = statusToResponseCodeMap[response.status]) !== null && _a !== void 0 ? _a : ResponseCode.UNRECOGNIZED;
-                            const uriResponse = {
-                                code: uriResponseOkCode,
-                                description: "",
-                                contentType: apiBinaryContentType,
-                                data: response.body,
-                                metadata: Object.assign(Object.assign({}, response.metadata), { [apiResponseStatusHeader]: responseCodeToNumber(responseCode).toString() }),
-                            };
-                            reply(uriResponse);
-                        });
+                        cancellationHandler();
                     }
                     catch (error) {
-                        remoteApiUriHandler_logger.warn("Client's Remote API request handler threw an error.", error);
+                        remoteApiUriHandler_logger.warn("Client's Remote API request cancellation handler threw an error.", error);
                     }
-                    if (typeof cancellationHandler === "function") {
-                        setCancellationHandler(() => {
-                            try {
-                                cancellationHandler();
-                            }
-                            catch (error) {
-                                remoteApiUriHandler_logger.warn("Client's Remote API request cancellation handler threw an error.", error);
-                            }
-                        });
-                    }
-                    break;
-                }
+                });
             }
         },
         processInternalError(error) {
@@ -28556,7 +28746,7 @@ function scan(accumulator, seed) {
 
 
 
-const logMethods = entries_entries(logLevelMap).map(([level]) => level);
+const logMethods = entries(logLevelMap).map(([level]) => level);
 const maxBufferedEntries = 15;
 const contextSeparator = "\n\n----------------- Context -----------------\n\n";
 const methodLength = logMethods.reduce((max, method) => Math.max(max, method.length), 0);
@@ -29562,7 +29752,61 @@ const setPreloadedConfiguration = Injectable("setPreloadedConfiguration", [lensC
     });
 });
 //# sourceMappingURL=preloadConfiguration.js.map
+;// ./node_modules/@snap/camera-kit/dist/geo/geoDataProvider.js
+
+
+function isGeoData(value) {
+    return typeguards_isRecord(value) && isWeatherData(value.weather);
+}
+function isWeatherData(value) {
+    return (typeguards_isRecord(value) &&
+        typeguards_isString(value.locationName) &&
+        isNumber(value.celsius) &&
+        isNumber(value.fahrenheit) &&
+        !isUndefined(value.hourlyForecasts) &&
+        isArrayOfType(isHourlyWeatherForecast, value.hourlyForecasts));
+}
+function isHourlyWeatherForecast(value) {
+    return (typeguards_isRecord(value) &&
+        isNumber(value.celsius) &&
+        isNumber(value.fahrenheit) &&
+        typeguards_isString(value.displayTime) &&
+        typeguards_isString(value.weatherCondition) &&
+        typeguards_isString(value.localizedWeatherCondition));
+}
+const geoDataProviderFactory = Injectable("geoDataProvider", () => {
+    return () => undefined;
+});
+//# sourceMappingURL=geoDataProvider.js.map
+;// ./node_modules/@snap/camera-kit/dist/geo/registerGeoDataProvider.js
+
+
+
+
+
+const registerGeoDataProvider_logger = getLogger("registerGeoDataProvider");
+const registerGeoDataProvider = Injectable("registerGeoDataProvider", [lensCoreFactory.token, geoDataProviderFactory.token], (lensCore, getGeoData) => {
+    if (!lensCore.setGeoDataProvider) {
+        registerGeoDataProvider_logger.warn("setGeoDataProvider is not defined.");
+        return;
+    }
+    lensCore.setGeoDataProvider(() => {
+        const geoData = getGeoData();
+        if (geoData) {
+            if (!isGeoData(geoData)) {
+                throw new Error("Expected GeoData object.");
+            }
+            lensCore.provideGeoData({ geoData });
+        }
+    });
+});
+//# sourceMappingURL=registerGeoDataProvider.js.map
 ;// ./node_modules/@snap/camera-kit/dist/CameraKit.js
+
+
+
+
+
 
 
 
@@ -29591,11 +29835,12 @@ let CameraKit = (() => {
     let _createSession_decorators;
     let _destroy_decorators;
     return _a = class CameraKit {
-            constructor(lensRepository, lensCore, pageVisibility, container, allMetrics) {
+            constructor(lensRepository, lensCore, pageVisibility, container, remoteConfig, allMetrics) {
                 this.lensRepository = (__runInitializers(this, _instanceExtraInitializers), lensRepository);
                 this.lensCore = lensCore;
                 this.pageVisibility = pageVisibility;
                 this.container = container;
+                this.remoteConfig = remoteConfig;
                 this.metrics = new TypedEventTarget();
                 this.sessions = [];
                 this.lenses = { repository: this.lensRepository };
@@ -29616,14 +29861,30 @@ let CameraKit = (() => {
                         }
                     };
                     const config = this.container.get(configurationToken);
+                    const trustedTypesHandler = getTrustedTypesHandler(config.trustedTypesPolicyName);
                     yield this.lensCore.initialize({
                         canvas: liveRenderTarget,
                         shouldUseWorker: !renderWhileTabHidden && config.shouldUseWorker,
                         exceptionHandler,
+                        trustedTypes: {
+                            policyName: trustedTypesHandler.policyName,
+                            getTrustedUrls: trustedTypesHandler.getTrustedUrls,
+                            trustUrl: trustedTypesHandler.trustUrl,
+                        },
                     });
+                    if (this.lensCore.setGpuIndex) {
+                        try {
+                            yield this.lensCore.setGpuIndex({
+                                gpuIndex: yield firstValueFrom(this.remoteConfig.getGpuIndexConfig()),
+                            });
+                        }
+                        catch (cause) {
+                            CameraKit_logger.error(new Error("Cannot set GPU index.", { cause }));
+                        }
+                    }
                     if (config.fonts.length > 0) {
                         this.lensCore.setSystemFonts({
-                            fonts: config.fonts,
+                            fonts: config.fonts.map((font) => (Object.assign(Object.assign({}, font), { data: font.data.slice(0) }))),
                         });
                     }
                     yield this.lensCore.setRenderLoopMode({
@@ -29636,9 +29897,11 @@ let CameraKit = (() => {
                         .provides(sessionStateFactory)
                         .provides(lensStateFactory)
                         .provides(lensKeyboardFactory)
+                        .provides(frameEventsFactory)
                         .provides(cameraKitSessionFactory)
                         .run(registerLensAssetsProvider)
                         .run(registerLensClientInterfaceHandler)
+                        .run(registerGeoDataProvider)
                         .run(setPreloadedConfiguration)
                         .run(reportSessionScopedMetrics)
                         .run(registerUriHandlers);
@@ -29669,8 +29932,9 @@ const cameraKitFactory = Injectable("CameraKit", [
     metricsEventTargetFactory.token,
     lensCoreFactory.token,
     pageVisibilityFactory.token,
+    remoteConfigurationFactory.token,
     CONTAINER,
-], (lensRepository, metrics, lensCore, pageVisibility, container) => new CameraKit(lensRepository, lensCore, pageVisibility, container, metrics));
+], (lensRepository, metrics, lensCore, pageVisibility, remoteConfiguration, container) => new CameraKit(lensRepository, lensCore, pageVisibility, container, remoteConfiguration, metrics));
 //# sourceMappingURL=CameraKit.js.map
 ;// ./node_modules/@snap/camera-kit/dist/platform/assertPlatformSupported.js
 
@@ -29808,7 +30072,7 @@ const getOrGenerateVendorUuid = (persistence) => tslib_es6_awaiter(void 0, void 
 });
 function listenAndReport(metricsEventTarget, metricsClient, eventHandlers, appVendorAndPartnerUuid) {
     const sessionId = esm_browser_v4();
-    businessEventsReporter_logger.log(`Session ID: ${sessionId}`);
+    businessEventsReporter_logger.info(`Session ID: ${sessionId}`);
     let sequenceId = 1;
     const makeBlizzardEvent = (event, appVendorUuid, partnerUuid) => {
         var _a;
@@ -29845,7 +30109,7 @@ function listenAndReport(metricsEventTarget, metricsClient, eventHandlers, appVe
             eventData,
         }));
     };
-    const metricsEvents = entries_entries(eventHandlers).map(([eventType, createEventData]) => fromEvent(metricsEventTarget, eventType).pipe(map((event) => ({ event, createEventData }))));
+    const metricsEvents = entries(eventHandlers).map(([eventType, createEventData]) => fromEvent(metricsEventTarget, eventType).pipe(map((event) => ({ event, createEventData }))));
     merge(...metricsEvents)
         .pipe(combineLatestWith(appVendorAndPartnerUuid))
         .subscribe(([{ event, createEventData }, { appVendorUuid, partnerUuid }]) => {
@@ -29929,25 +30193,12 @@ const businessEventsReporterFactory = Injectable("businessEventsReporter", [
 
 
 
-
-
 const registerLogEntriesSubscriber = Injectable("registerLogEntriesSubscriber", [configurationToken, logEntriesFactory.token], (configuration, logEntries) => {
     logEntries
         .pipe(filter((entry) => logLevelMap[entry.level] >= logLevelMap[configuration.logLevel]))
         .subscribe((logEntry) => {
-        switch (configuration.logger) {
-            case "console":
-                const messages = getPlatformInfo().browser.brand === "Chrome"
-                    ? logEntry.messages.map((message) => {
-                        if (!(message instanceof Error))
-                            return message;
-                        message.stack = stringifyError(message);
-                        return message;
-                    })
-                    : logEntry.messages;
-                console[logEntry.level](`[CameraKit.${logEntry.module}]`, ...messages);
-                break;
-        }
+        const logMethod = configuration.logger[logEntry.level];
+        logMethod(`[CameraKit.${logEntry.module}]`, ...logEntry.messages);
     });
 });
 //# sourceMappingURL=registerLogEntriesSubscriber.js.map
@@ -30097,6 +30348,7 @@ const cameraKitLensSourceFactory = Injectable(lensSourcesFactory.token, [lensSou
 
 
 
+
 const bootstrapCameraKit_logger = getLogger("bootstrapCameraKit");
 const nonWrappableErrors = [
     "ConfigurationError",
@@ -30123,6 +30375,7 @@ function bootstrapCameraKit(configuration, provide) {
                 .provides(lensSourcesFactory)
                 .provides(remoteApiServicesFactory)
                 .provides(uriHandlersFactory)
+                .provides(geoDataProviderFactory)
                 .provides(externalMetricsSubjectFactory);
             const publicContainer = provide ? provide(defaultPublicContainer) : defaultPublicContainer;
             const telemetryContainer = Container.provides(publicContainer)
@@ -30178,12 +30431,13 @@ function createExtension() {
 
 
 
-function getExtensionRequestContext() {
+
+const getExtensionRequestContext = memoize_memoize(function getExtensionRequestContext() {
     return ExtensionRequestContext.encode({
         userAgent: getCameraKitUserAgent(),
         locale: getPlatformInfo().fullLocale,
     }).finish();
-}
+});
 const extensionRequestContext = getExtensionRequestContext();
 //# sourceMappingURL=extensionRequestContext.js.map
 ;// ./node_modules/@snap/camera-kit/dist/media-sources/FunctionSource.js
@@ -30301,6 +30555,7 @@ function createImageSource(image, options = {}) {
 }
 //# sourceMappingURL=ImageSource.js.map
 ;// ./node_modules/@snap/camera-kit/dist/index.js
+
 
 
 
