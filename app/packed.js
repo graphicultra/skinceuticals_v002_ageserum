@@ -30603,6 +30603,9 @@ let holdTimeoutId = null;
 let recordingStarted = false;
 let mediaType = 'video'; // 'photo' or 'video'
 const HOLD_THRESHOLD = 300; // milliseconds
+const MAX_RECORD_MS = 10000; // max recording duration for progress ring
+let progressAnimationId = null;
+let mediaStream = null;
 
 function showError(message) {
   console.error(message);
@@ -30622,6 +30625,31 @@ function showError(message) {
     document.body.appendChild(el);
   }
   el.textContent = message;
+}
+
+function updateProgressRing() {
+  if (!isRecording) return;
+  
+  const elapsed = Date.now() - pressStartTime - HOLD_THRESHOLD;
+  const progress = Math.min(elapsed / MAX_RECORD_MS, 1);
+  
+  recordToggleButton.style.setProperty('--progress', progress);
+  
+  if (progress < 1) {
+    progressAnimationId = requestAnimationFrame(updateProgressRing);
+  }
+}
+
+function startProgressRing() {
+  progressAnimationId = requestAnimationFrame(updateProgressRing);
+}
+
+function stopProgressRing() {
+  if (progressAnimationId) {
+    cancelAnimationFrame(progressAnimationId);
+    progressAnimationId = null;
+  }
+  recordToggleButton.style.setProperty('--progress', 0);
 }
 
 async function main() {
@@ -30647,8 +30675,8 @@ async function main() {
 
     //it will use the back camera. If you want to use the front camera (selfie mode), just change the facingMode to 'user' and the cameraType to 'front'
 
-    const stream = await navigator.mediaDevices.getUserMedia({ video: {facingMode:'user'} });
-    const source = createMediaStreamSource(stream, { cameraType: 'front' });
+    mediaStream = await navigator.mediaDevices.getUserMedia({ video: {facingMode:'user'}, audio: true });
+    const source = createMediaStreamSource(mediaStream, { cameraType: 'front' });
     
     await session.setSource(source);
 
@@ -30675,7 +30703,7 @@ async function init() {
   recording_ui = document.querySelector("#recording_ui")
   
 
-  mediaRecorderOptions = { audio: false, video: true, videoBitsPerSecond: 2500000 };
+  mediaRecorderOptions = { audio: true, video: true, videoBitsPerSecond: 2500000 };
 
   const capturePhoto = () => {
     try {
@@ -30727,9 +30755,44 @@ async function init() {
     // Delay starting the actual recording until we know it's a hold
     holdTimeoutId = setTimeout(() => {
       recordingStarted = true;
-      const mediaStream = liveRenderTarget.captureStream(30)
+      startProgressRing();
+      
+      // Create an offscreen canvas to capture flipped video
+      const recordingCanvas = document.createElement('canvas');
+      recordingCanvas.width = window.innerWidth;
+      recordingCanvas.height = window.innerHeight;
+      const ctx = recordingCanvas.getContext('2d');
+      
+      let recordingAnimationId = null;
+      
+      const captureFrame = () => {
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(liveRenderTarget, -recordingCanvas.width, 0);
+        ctx.restore();
+        recordingAnimationId = requestAnimationFrame(captureFrame);
+      };
+      
+      // Draw first frame before starting recorder
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.drawImage(liveRenderTarget, -recordingCanvas.width, 0);
+      ctx.restore();
+      
+      recordingAnimationId = requestAnimationFrame(captureFrame);
+      
+      const canvasStream = recordingCanvas.captureStream(30);
+      
+      // Combine canvas video stream with audio from mediaStream
+      const combinedStream = new MediaStream();
+      canvasStream.getVideoTracks().forEach(track => {
+        combinedStream.addTrack(track);
+      });
+      mediaStream.getAudioTracks().forEach(track => {
+        combinedStream.addTrack(track);
+      });
 
-      mediaRecorder = new MediaRecorder(mediaStream, mediaRecorderOptions)
+      mediaRecorder = new MediaRecorder(combinedStream, mediaRecorderOptions)
       
 
       var chunks = [];
@@ -30767,7 +30830,6 @@ async function init() {
         video.setAttribute('loop','')
         video.setAttribute('playsinline','')
         video.setAttribute('crossorigin','anonymous')
-        video.style.transform = "scaleX(-1)";
         const videoSource = document.createElement('source');
         videoSource.type = 'video/mp4';
         videoSource.src = URL.createObjectURL(blob);
@@ -30777,6 +30839,12 @@ async function init() {
 
         videoContainer.classList.add('show');
       })
+      
+      mediaRecorder.addEventListener("stop", () => {
+        if (recordingAnimationId) {
+          cancelAnimationFrame(recordingAnimationId);
+        }
+      })
     }, HOLD_THRESHOLD);
   }
 
@@ -30784,6 +30852,7 @@ async function init() {
     if (!isRecording) return
     isRecording = false
     recordToggleButton.classList.remove('held')
+    stopProgressRing();
     
     const pressDuration = Date.now() - pressStartTime;
     
