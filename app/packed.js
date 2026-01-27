@@ -30607,6 +30607,15 @@ const MAX_RECORD_MS = 10000; // max recording duration for progress ring
 let progressAnimationId = null;
 let mediaStream = null;
 
+const DPR = window.devicePixelRatio || 1;
+
+function getRenderSize() {
+  return {
+    width: Math.round(window.innerWidth * DPR),
+    height: Math.round(window.innerHeight * DPR),
+  };
+}
+
 function showError(message) {
   console.error(message);
   let el = document.getElementById('error_message');
@@ -30626,6 +30635,20 @@ function showError(message) {
   }
   el.textContent = message;
 }
+
+// Surface any unexpected errors directly in the page UI
+window.addEventListener('error', (event) => {
+  if (!event) return;
+  const msg = event.error?.message || event.message || String(event);
+  showError(msg);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  if (!event) return;
+  const reason = event.reason || {};
+  const msg = reason.message || String(reason);
+  showError(msg);
+});
 
 function updateProgressRing() {
   if (!isRecording) return;
@@ -30683,7 +30706,8 @@ async function main() {
     const lens = await cameraKit.lensRepository.loadLens('8674c478-95c7-440d-81d9-5b870a3fcbbe','0ab3279f-d6d1-4f85-b379-8f0e1a6a7173');
     await session.applyLens(lens);
 
-    session.source.setRenderSize(window.innerWidth,window.innerHeight)
+    const { width, height } = getRenderSize();
+    session.source.setRenderSize(width, height);
     await session.play();
     console.log("Lens rendering has started!");
 
@@ -30709,8 +30733,9 @@ async function init() {
     try {
       // Create a canvas to capture the frame
       const canvas = document.createElement('canvas');
-      canvas.width = liveRenderTarget.videoWidth || window.innerWidth;
-      canvas.height = liveRenderTarget.videoHeight || window.innerHeight;
+      const { width, height } = getRenderSize();
+      canvas.width = width;
+      canvas.height = height;
       
       const ctx = canvas.getContext('2d');
       // Mirror the image like the live feed
@@ -30759,8 +30784,9 @@ async function init() {
       
       // Create an offscreen canvas to capture flipped video
       const recordingCanvas = document.createElement('canvas');
-      recordingCanvas.width = window.innerWidth;
-      recordingCanvas.height = window.innerHeight;
+      const { width, height } = getRenderSize();
+      recordingCanvas.width = width;
+      recordingCanvas.height = height;
       const ctx = recordingCanvas.getContext('2d');
       
       let recordingAnimationId = null;
@@ -30917,10 +30943,16 @@ async function init() {
       videoContainer.classList.remove('show');
     });
   
-}
+  }
 
 
-document.addEventListener("DOMContentLoaded", main);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      main().catch(err => showError(err.message || String(err)));
+    });
+  } else {
+    main().catch(err => showError(err.message || String(err)));
+  }
 })();
 
 /******/ })()
