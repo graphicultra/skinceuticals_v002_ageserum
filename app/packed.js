@@ -30683,7 +30683,10 @@ async function main() {
     const lens = await cameraKit.lensRepository.loadLens('8674c478-95c7-440d-81d9-5b870a3fcbbe','0ab3279f-d6d1-4f85-b379-8f0e1a6a7173');
     await session.applyLens(lens);
 
-    session.source.setRenderSize(window.innerWidth,window.innerHeight)
+    session.source.setRenderSize(
+  Math.round(window.innerWidth * dpr),
+  Math.round(window.innerHeight * dpr)
+);
     await session.play();
     console.log("Lens rendering has started!");
 
