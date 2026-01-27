@@ -109,7 +109,7 @@ async function main() {
     
     await session.setSource(source);
 
-    const lens = await cameraKit.lensRepository.loadLens('8674c478-95c7-440d-81d9-5b870a3fcbbe','0ab3279f-d6d1-4f85-b379-8f0e1a6a7173');
+    const lens = await cameraKit.lensRepository.loadLens('d4343a7f-5784-4d85-8bd0-7b414bc54d1e','0ab3279f-d6d1-4f85-b379-8f0e1a6a7173');
     await session.applyLens(lens);
 
     const { width, height } = getRenderSize();
